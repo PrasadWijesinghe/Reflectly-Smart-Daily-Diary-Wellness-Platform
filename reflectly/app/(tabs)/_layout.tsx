@@ -1,9 +1,11 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { View } from "react-native";
+import FloatingChatButton from "../../components/FloatingChatButton";
 
 export default function TabLayout() {
   return (
+    <View style={{ flex: 1 }}>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: "#3B82F6",
@@ -148,5 +150,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    <FloatingChatButton />
+    </View>
   );
 }
