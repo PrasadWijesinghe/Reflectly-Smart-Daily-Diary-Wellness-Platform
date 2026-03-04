@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useAuth } from "../../context/AuthContext";
 
 type SettingRow = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -100,6 +101,7 @@ function SettingItem({ item }: { item: SettingRow }) {
 }
 
 export default function ProfileScreen() {
+  const { logout } = useAuth();
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -212,6 +214,16 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={logout}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -415,6 +427,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 24,
     paddingBottom: 10,
+  },
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginHorizontal: 20,
+    marginTop: 20,
+    gap: 8,
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#EF4444",
   },
   footerVersion: {
     fontSize: 12,
