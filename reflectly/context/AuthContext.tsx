@@ -1,15 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter, useSegments } from "expo-router";
-
 import { Platform } from "react-native";
 
 const getApiUrl = () => {
   if (Platform.OS === "android") {
-    // Works for both physical device and emulator via your LAN IP
     return "http://192.168.1.2:5000/api";
   }
-  // iOS simulator / web
   return "http://localhost:5000/api";
 };
 
@@ -34,25 +30,6 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const useAuth = () => useContext(AuthContext);
 
-function useProtectedRoute(user: User | null, isLoading: boolean) {
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoading) return;
-
-    const inAuthGroup = segments[0] === "(auth)";
-
-    if (!user && !inAuthGroup) {
-      // Not logged in → redirect to login
-      router.replace("/(auth)/login");
-    } else if (user && inAuthGroup) {
-      // Logged in → redirect to main app
-      router.replace("/(tabs)");
-    }
-  }, [user, segments, isLoading, router]);
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -62,8 +39,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadStoredAuth();
   }, []);
-
-  useProtectedRoute(user, isLoading);
 
   async function loadStoredAuth() {
     try {
