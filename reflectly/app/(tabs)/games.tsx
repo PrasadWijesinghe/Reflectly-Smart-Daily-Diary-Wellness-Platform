@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 
 type Game = {
   id: number;
@@ -71,6 +72,8 @@ const BENEFITS = [
 ];
 
 export default function GamesScreen() {
+  const router = useRouter();
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -81,6 +84,13 @@ export default function GamesScreen() {
         style={styles.header}
       >
         <View style={styles.headerContent}>
+          <TouchableOpacity 
+            onPress={() => router.back()}
+            style={{ marginRight: 12, padding: 4 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
           <View style={styles.headerLeft}>
             <View style={styles.headerIcon}>
               <Ionicons name="game-controller" size={18} color="#FFFFFF" />

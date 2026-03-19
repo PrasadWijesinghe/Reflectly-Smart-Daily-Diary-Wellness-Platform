@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useAuth } from "../../context/AuthContext";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -47,6 +48,8 @@ const SUGGESTIONS = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const firstName = user?.name?.split(" ")[0] || "there";
   const screenWidth = Dimensions.get("window").width;
 
   const getGreeting = () => {
@@ -79,7 +82,7 @@ export default function HomeScreen() {
                 {getGreeting()} 🌅
               </Text>
               <Text className="text-white text-2xl font-bold mt-1">
-                Hi, Alex! 👋
+                Hi, {firstName}! 👋
               </Text>
               <Text className="text-white/70 text-sm mt-1">
                 How are you feeling today?
@@ -190,7 +193,7 @@ export default function HomeScreen() {
           </View>
 
           {/* ── Feeling Stressed Banner ── */}
-          <TouchableOpacity activeOpacity={0.85} className="mb-4">
+          <TouchableOpacity activeOpacity={0.85} className="mb-4" onPress={() => router.push("/(tabs)/games")}>
             <View
               style={{
                 backgroundColor: "#2563EB",
@@ -258,6 +261,7 @@ export default function HomeScreen() {
                 key={index}
                 activeOpacity={0.7}
                 className="bg-white rounded-2xl p-4 mb-3 shadow-sm flex-row items-center"
+                onPress={item.title === "Play a quick game" ? () => router.push("/(tabs)/games") : undefined}
               >
                 <View
                   style={{

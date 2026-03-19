@@ -1,11 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
+import Constants from "expo-constants";
 
 const getApiUrl = () => {
-  if (Platform.OS === "android") {
-    return "http://192.168.1.2:5000/api";
+  // In development, Expo exposes the dev server's host (e.g. "192.168.1.5:8081")
+  // We extract just the IP so the app always uses the correct machine address
+  const hostUri = Constants.expoConfig?.hostUri; // e.g. "192.168.1.5:8081"
+  if (hostUri) {
+    const host = hostUri.split(":")[0]; // extract just the IP
+    return `http://${host}:5000/api`;
   }
+  // Fallback for production or when hostUri is unavailable
   return "http://localhost:5000/api";
 };
 

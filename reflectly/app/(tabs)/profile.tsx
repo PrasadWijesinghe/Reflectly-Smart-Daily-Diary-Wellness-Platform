@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 
 type SettingRow = {
@@ -101,7 +102,13 @@ function SettingItem({ item }: { item: SettingRow }) {
 }
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const { logout } = useAuth();
+
+  async function handleLogout() {
+    await logout();
+    router.replace("/(auth)/login");
+  }
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -218,7 +225,7 @@ export default function ProfileScreen() {
         {/* Logout Button */}
         <TouchableOpacity
           style={styles.logoutBtn}
-          onPress={logout}
+          onPress={handleLogout}
           activeOpacity={0.8}
         >
           <Ionicons name="log-out-outline" size={20} color="#EF4444" />
