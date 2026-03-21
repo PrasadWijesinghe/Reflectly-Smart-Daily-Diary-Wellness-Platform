@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
 const diaryRoutes = require("./routes/diaryRoutes");
+const transcribeRoutes = require("./routes/transcribeRoutes");
 
 const app = express();
 
@@ -23,5 +24,6 @@ app.get("/", (req, res) => {
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/diary", diaryRoutes);
+app.use("/api", transcribeRoutes);
 
 module.exports = app;

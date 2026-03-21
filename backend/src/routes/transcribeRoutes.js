@@ -1,0 +1,32 @@
+const express = require("express");
+const multer = require("multer");
+const path = require("path");
+const { transcribe } = require("../controllers/transcribeController");
+
+const router = express.Router();
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "../../uploads"));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, `audio-${uniqueSuffix}.m4a`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("audio/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only audio files are allowed."));
+    }
+  },
+});
+
+router.post("/transcribe", upload.single("audio"), transcribe);
+
+module.exports = router;

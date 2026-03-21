@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Text,
   View,
@@ -7,9 +7,27 @@ import {
   TextInput,
   StatusBar,
   StyleSheet,
+  Alert,
+  Animated,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { Audio } from "expo-av";
+import Constants from "expo-constants";
+import * as Haptics from "expo-haptics";
+
+const getApiUrl = () => {
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const host = hostUri.split(":")[0];
+    return `http://${host}:5000/api`;
+  }
+  return "http://localhost:5000/api";
+};
+const API_URL = getApiUrl();
+
+type RecordingState = "idle" | "recording" | "processing";
 
 const TAGS = [
   { label: "Study", icon: "📖" },
@@ -70,6 +88,155 @@ export default function DiaryScreen() {
   const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
   const [diaryText, setDiaryText] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
+  const [recordingDuration, setRecordingDuration] = useState(0);
+
+  const recording = useRef<Audio.Recording | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (durationInterval.current) clearInterval(durationInterval.current);
+      if (recording.current) {
+        recording.current.stopAndUnloadAsync().catch(() => {});
+      }
+    };
+  }, []);
+
+  const startPulseAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.3,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  };
+
+  const stopPulseAnimation = () => {
+    pulseAnim.stopAnimation();
+    pulseAnim.setValue(1);
+  };
+
+  const startRecording = async () => {
+    try {
+      const { granted } = await Audio.requestPermissionsAsync();
+      if (!granted) {
+        Alert.alert(
+          "Permission Required",
+          "Microphone permission is needed to record your voice."
+        );
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: rec } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      recording.current = rec;
+      setRecordingState("recording");
+      setRecordingDuration(0);
+      startPulseAnimation();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      durationInterval.current = setInterval(() => {
+        setRecordingDuration((d) => d + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+      Alert.alert("Error", "Could not start recording. Please try again.");
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording.current) return;
+
+    try {
+      if (durationInterval.current) {
+        clearInterval(durationInterval.current);
+        durationInterval.current = null;
+      }
+      stopPulseAnimation();
+
+      setRecordingState("processing");
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      await recording.current.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+      });
+
+      const uri = recording.current.getURI();
+      recording.current = null;
+
+      if (!uri) {
+        setRecordingState("idle");
+        Alert.alert("Error", "No recording found.");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("audio", {
+        uri,
+        name: "recording.m4a",
+        type: "audio/m4a",
+      } as any);
+
+      const res = await fetch(`${API_URL}/transcribe`, {
+        method: "POST",
+        body: formData,
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Upload failed" }));
+        throw new Error(err.error || "Transcription failed");
+      }
+
+      const data = await res.json();
+      const newText = data.text ? data.text.trim() : "";
+
+      if (newText) {
+        setDiaryText((prev) => (prev ? prev + " " + newText : newText));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (err: any) {
+      console.error("Transcription error:", err);
+      Alert.alert(
+        "Transcription Failed",
+        err.message || "Could not transcribe audio. Please try again."
+      );
+    } finally {
+      stopPulseAnimation();
+      setRecordingState("idle");
+    }
+  };
+
+  const handleVoiceButtonPress = () => {
+    if (recordingState === "idle") {
+      startRecording();
+    } else if (recordingState === "recording") {
+      stopRecording();
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   const today = new Date();
   const dayNames = [
@@ -203,7 +370,46 @@ export default function DiaryScreen() {
           <View style={styles.entryHeader}>
             <Text style={{ fontSize: 18 }}>✍️</Text>
             <Text style={styles.entryHeaderText}>What's on your mind?</Text>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity
+              style={[
+                styles.voiceButton,
+                recordingState === "recording" && styles.voiceButtonRecording,
+                recordingState === "processing" && styles.voiceButtonProcessing,
+              ]}
+              onPress={handleVoiceButtonPress}
+              activeOpacity={0.7}
+              disabled={recordingState === "processing"}
+            >
+              {recordingState === "processing" ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : recordingState === "recording" ? (
+                <Animated.View
+                  style={[
+                    styles.voiceButtonInner,
+                    { transform: [{ scale: pulseAnim }] },
+                  ]}
+                >
+                  <View style={styles.stopIcon} />
+                </Animated.View>
+              ) : (
+                <Ionicons name="mic" size={16} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
           </View>
+          {recordingState === "recording" && (
+            <View style={styles.recordingIndicator}>
+              <View style={styles.recordingDot} />
+              <Text style={styles.recordingText}>
+                Recording {formatDuration(recordingDuration)}
+              </Text>
+            </View>
+          )}
+          {recordingState === "processing" && (
+            <View style={styles.recordingIndicator}>
+              <Text style={styles.processingText}>Transcribing...</Text>
+            </View>
+          )}
           <TextInput
             style={styles.textInput}
             placeholder="Write your thoughts here... How was your day? What made you smile? What challenged you?"
@@ -437,6 +643,54 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#EF4444",
     marginLeft: 8,
+  },
+  voiceButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#3B82F6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+  voiceButtonRecording: {
+    backgroundColor: "#EF4444",
+  },
+  voiceButtonProcessing: {
+    backgroundColor: "#9CA3AF",
+  },
+  voiceButtonInner: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stopIcon: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    backgroundColor: "#FFFFFF",
+  },
+  recordingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#EF4444",
+    marginRight: 6,
+  },
+  recordingText: {
+    fontSize: 12,
+    color: "#EF4444",
+    fontWeight: "600",
+  },
+  processingText: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    fontWeight: "600",
   },
   textInput: {
     minHeight: 120,
