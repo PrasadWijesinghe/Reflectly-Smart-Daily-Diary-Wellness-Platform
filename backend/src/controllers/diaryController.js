@@ -1,17 +1,5 @@
 const prisma = require("../utils/prisma");
-
-function generateSummary(content) {
-  const trimmed = content.trim();
-  if (!trimmed) return "";
-
-  const sentenceMatch = trimmed.match(/^(.+?[.!?])\s/);
-  if (sentenceMatch && sentenceMatch[1].length <= 120) {
-    return sentenceMatch[1];
-  }
-
-  if (trimmed.length <= 120) return trimmed;
-  return trimmed.substring(0, 120) + "...";
-}
+const { generateAISummary } = require("../utils/gemini");
 
 function normalizeDate(dateStr) {
   if (dateStr) {
@@ -87,7 +75,7 @@ const createEntry = async (req, res) => {
     }
 
     const normalizedDate = normalizeDate(date);
-    const summary = generateSummary(content);
+    const summary = await generateAISummary(content);
     const tagConnect =
       tagIds && tagIds.length > 0
         ? { connect: tagIds.map((id) => ({ id })) }
@@ -164,7 +152,7 @@ const updateEntry = async (req, res) => {
     const updateData = {};
     if (content !== undefined) {
       updateData.content = content;
-      updateData.summary = generateSummary(content);
+      updateData.summary = await generateAISummary(content);
     }
     if (tagIds !== undefined) {
       updateData.tags = {
