@@ -1,17 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Constants from "expo-constants";
-
-const getApiUrl = () => {
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (hostUri) {
-    const host = hostUri.split(":")[0];
-    return `http://${host}:5000/api`;
-  }
-  return "http://localhost:5000/api";
-};
-const API_URL = getApiUrl();
+import { getApiUrl } from "../utils/api";
 
 type Tag = {
   id: number;
@@ -57,7 +47,7 @@ export default function DiaryCard({ entry, token, onEdit, onDelete }: Props) {
         style: "destructive",
         onPress: async () => {
           try {
-            const res = await fetch(`${API_URL}/diary/${entry.id}`, {
+            const res = await fetch(`${getApiUrl()}/diary/${entry.id}`, {
               method: "DELETE",
               headers: { Authorization: `Bearer ${token}` },
             });
