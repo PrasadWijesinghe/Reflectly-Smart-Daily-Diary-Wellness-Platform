@@ -1,4 +1,7 @@
 const prisma = require("../utils/prisma");
+const { analyzeMood } = require("../utils/moodAnalyzer");
+const { analyzeStress } = require("../utils/stressAnalyzer");
+const { analyzeTopic } = require("../utils/topicAnalyzer");
 
 function generateSummary(content) {
   const trimmed = content.trim();
@@ -88,6 +91,9 @@ const createEntry = async (req, res) => {
 
     const normalizedDate = normalizeDate(date);
     const summary = generateSummary(content);
+    const mood = await analyzeMood(summary);
+    const stressLevel = await analyzeStress(summary);
+    const topic = await analyzeTopic(summary);
     const tagConnect =
       tagIds && tagIds.length > 0
         ? { connect: tagIds.map((id) => ({ id })) }
@@ -110,6 +116,9 @@ const createEntry = async (req, res) => {
       data: {
         content,
         summary,
+        mood,
+        stressLevel,
+        topic,
         date: normalizedDate,
         userId: req.user.userId,
         ...(tagConnect && { tags: tagConnect }),
@@ -165,6 +174,9 @@ const updateEntry = async (req, res) => {
     if (content !== undefined) {
       updateData.content = content;
       updateData.summary = generateSummary(content);
+      updateData.mood = await analyzeMood(updateData.summary);
+      updateData.stressLevel = await analyzeStress(updateData.summary);
+      updateData.topic = await analyzeTopic(updateData.summary);
     }
     if (tagIds !== undefined) {
       updateData.tags = {

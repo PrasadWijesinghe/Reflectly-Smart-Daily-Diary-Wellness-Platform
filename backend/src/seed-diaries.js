@@ -1,6 +1,9 @@
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 const prisma = require("./utils/prisma");
+const { analyzeMood } = require("./utils/moodAnalyzer");
+const { analyzeStress } = require("./utils/stressAnalyzer");
+const { analyzeTopic } = require("./utils/topicAnalyzer");
 
 const DIARY_DATA = [
   {
@@ -129,12 +132,18 @@ async function seed() {
     targetDate.setHours(12, 0, 0, 0);
 
     const tagConnects = data.tags.filter(name => tagMap[name]).map(name => ({ id: tagMap[name] }));
+    const moodContent = await analyzeMood(data.summary);
+    const stressScore = await analyzeStress(data.summary);
+    const topicValue = await analyzeTopic(data.summary);
 
     await prisma.dailyDiary.create({
       data: {
         date: targetDate,
         summary: data.summary,
         content: data.content,
+        mood: moodContent,
+        stressLevel: stressScore,
+        topic: topicValue,
         userId: user.id,
         tags: {
           connect: tagConnects
