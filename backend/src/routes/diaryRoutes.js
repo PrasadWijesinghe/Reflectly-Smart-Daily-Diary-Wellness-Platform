@@ -3,6 +3,7 @@ const {
   createEntry,
   getEntries,
   getEntry,
+  getEntryDates,
   updateEntry,
   deleteEntry,
 } = require("../controllers/diaryController");
@@ -13,6 +14,7 @@ const router = express.Router();
 // All diary routes require authentication
 router.use(authenticate);
 
+router.get("/dates", getEntryDates);
 router.post("/", createEntry);
 router.get("/", getEntries);
 router.get("/:id", getEntry);
