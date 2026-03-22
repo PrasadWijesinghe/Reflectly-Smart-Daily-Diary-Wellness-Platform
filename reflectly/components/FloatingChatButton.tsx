@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   TouchableOpacity,
   StyleSheet,
@@ -11,12 +11,24 @@ import {
   Modal,
   Animated,
   Dimensions,
-  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import Constants from "expo-constants";
+import { useAuth } from "../context/AuthContext";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+const getApiUrl = () => {
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const host = hostUri.split(":")[0];
+    return `http://${host}:5000/api`;
+  }
+  return "http://localhost:5000/api";
+};
+
+const API_URL = getApiUrl();
 
 type Message = {
   id: number;
@@ -32,17 +44,6 @@ const QUICK_QUESTIONS = [
   { label: "Quick reflection", emoji: "\u2728" },
 ];
 
-const BOT_RESPONSES: Record<string, string> = {
-  "Summarize my week":
-    "Based on your entries this week, you've been mostly feeling positive! \ud83c\udf1f You wrote about studying, some exam stress, and a great win. Your mood has been trending upward \u2014 keep it going!",
-  "Why am I stressed?":
-    "Looking at your recent entries, it seems like exams and deadlines are the main stressors. \ud83d\udcda Try taking short breaks between study sessions and maybe play a quick stress-relief game! \ud83c\udfae",
-  "Suggest a game":
-    "How about trying Pop Bubbles? \ud83e\udee7 It\u2019s a simple, satisfying game that can help you de-stress in just a few minutes. Head over to the Games tab to give it a try!",
-  "Quick reflection":
-    "Take a moment to think: What\u2019s one thing that made you smile today? \ud83d\ude0a Writing it down, even if it\u2019s small, can boost your mood and help you appreciate the little things.",
-};
-
 function getTimeString() {
   const now = new Date();
   let h = now.getHours();
@@ -53,16 +54,18 @@ function getTimeString() {
 }
 
 export default function FloatingChatButton() {
+  const { token } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: "Hey there! I\u2019m Diary Buddy \ud83c\udf1f Your friendly companion for reflection and support. How can I help you today?",
+      text: "Hey there! I'm Diary Buddy. Your reflection companion is ready whenever you are.",
       isBot: true,
       time: getTimeString(),
     },
   ]);
   const [inputText, setInputText] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -83,47 +86,89 @@ export default function FloatingChatButton() {
     }).start(() => setIsOpen(false));
   }
 
-  function addBotReply(userText: string) {
-    setTimeout(() => {
-      const matched = BOT_RESPONSES[userText];
-      const reply =
-        matched ||
-        `That\u2019s a great thought! \ud83d\udcad I\u2019d encourage you to write about it in your diary. Reflecting on "${userText}" can bring clarity and peace. \ud83d\ude0a`;
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: prev.length + 1,
-          text: reply,
-          isBot: true,
-          time: getTimeString(),
-        },
-      ]);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    }, 800);
-  }
-
-  function handleSend() {
-    const text = inputText.trim();
-    if (!text) return;
-
+  function appendBotMessage(text: string) {
     setMessages((prev) => [
       ...prev,
-      { id: prev.length + 1, text, isBot: false, time: getTimeString() },
+      {
+        id: prev.length + 1,
+        text,
+        isBot: true,
+        time: getTimeString(),
+      },
     ]);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+  }
+
+  async function addBotReply(userText: string, nextMessages: Message[]) {
+    if (!token) {
+      appendBotMessage("Please log in first so Diary Buddy can access your diary context securely.");
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
+      const res = await fetch(`${API_URL}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: userText,
+          history: nextMessages.slice(-6).map((msg) => ({
+            text: msg.text,
+            isBot: msg.isBot,
+          })),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Diary Buddy could not respond right now.");
+      }
+
+      appendBotMessage(data.reply);
+    } catch (error: any) {
+      appendBotMessage(
+        error?.message ||
+          "Diary Buddy is having trouble right now. Please try again in a moment."
+      );
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  async function handleSend() {
+    const text = inputText.trim();
+    if (!text || isSending) return;
+
+    const nextMessages = [
+      ...messages,
+      { id: messages.length + 1, text, isBot: false, time: getTimeString() },
+    ];
+
+    setMessages(nextMessages);
     setInputText("");
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    addBotReply(text);
+    await addBotReply(text, nextMessages);
   }
 
-  function handleQuickQuestion(label: string) {
-    setMessages((prev) => [
-      ...prev,
-      { id: prev.length + 1, text: label, isBot: false, time: getTimeString() },
-    ]);
+  async function handleQuickQuestion(label: string) {
+    if (isSending) return;
+
+    const nextMessages = [
+      ...messages,
+      { id: messages.length + 1, text: label, isBot: false, time: getTimeString() },
+    ];
+
+    setMessages(nextMessages);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    addBotReply(label);
+    await addBotReply(label, nextMessages);
   }
+
+  const isSendDisabled = isSending || !inputText.trim();
 
   if (!isOpen) {
     return (
@@ -151,7 +196,6 @@ export default function FloatingChatButton() {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           keyboardVerticalOffset={0}
         >
-          {/* Header */}
           <LinearGradient
             colors={["#3B82F6", "#2563EB"]}
             start={{ x: 0, y: 0 }}
@@ -166,7 +210,9 @@ export default function FloatingChatButton() {
                 <Text style={styles.headerTitle}>Diary Buddy</Text>
                 <View style={styles.statusRow}>
                   <View style={styles.statusDot} />
-                  <Text style={styles.headerSubtitle}>Always here for you</Text>
+                  <Text style={styles.headerSubtitle}>
+                    {isSending ? "Thinking..." : "Always here for you"}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -179,7 +225,6 @@ export default function FloatingChatButton() {
             </TouchableOpacity>
           </LinearGradient>
 
-          {/* Messages */}
           <ScrollView
             ref={scrollRef}
             style={styles.messagesContainer}
@@ -229,7 +274,6 @@ export default function FloatingChatButton() {
             ))}
           </ScrollView>
 
-          {/* Quick Questions */}
           {messages.length <= 2 && (
             <View style={styles.quickContainer}>
               <Text style={styles.quickLabel}>Quick questions:</Text>
@@ -244,6 +288,7 @@ export default function FloatingChatButton() {
                     style={styles.quickChip}
                     onPress={() => handleQuickQuestion(q.label)}
                     activeOpacity={0.7}
+                    disabled={isSending}
                   >
                     <Text style={styles.quickChipText}>
                       {q.label} {q.emoji}
@@ -254,32 +299,32 @@ export default function FloatingChatButton() {
             </View>
           )}
 
-          {/* Input */}
           <View style={styles.inputContainer}>
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.textInput}
-                placeholder="Type your message..."
+                placeholder={isSending ? "Diary Buddy is replying..." : "Type your message..."}
                 placeholderTextColor="#94A3B8"
                 value={inputText}
                 onChangeText={setInputText}
                 onSubmitEditing={handleSend}
                 returnKeyType="send"
                 multiline={false}
+                editable={!isSending}
               />
               <TouchableOpacity
                 onPress={handleSend}
                 style={[
                   styles.sendBtn,
-                  !inputText.trim() && styles.sendBtnDisabled,
+                  isSendDisabled && styles.sendBtnDisabled,
                 ]}
                 activeOpacity={0.7}
-                disabled={!inputText.trim()}
+                disabled={isSendDisabled}
               >
                 <Ionicons
                   name="send"
                   size={18}
-                  color={inputText.trim() ? "#fff" : "#94A3B8"}
+                  color={isSendDisabled ? "#94A3B8" : "#fff"}
                 />
               </TouchableOpacity>
             </View>
@@ -320,7 +365,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     overflow: "hidden",
   },
-  /* Header */
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -374,7 +418,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Messages */
   messagesContainer: {
     flex: 1,
     backgroundColor: "#F8FAFC",
@@ -444,7 +487,6 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.7)",
     textAlign: "right",
   },
-  /* Quick Questions */
   quickContainer: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -474,7 +516,6 @@ const styles = StyleSheet.create({
     color: "#3B82F6",
     fontWeight: "600",
   },
-  /* Input */
   inputContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
