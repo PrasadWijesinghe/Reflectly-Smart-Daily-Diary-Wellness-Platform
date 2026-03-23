@@ -7,22 +7,33 @@ generator client {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
+  id        Int          @id @default(autoincrement())
   name      String
-  email     String   @unique
+  email     String       @unique
   password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  entries   DiaryEntry[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  diaries   DailyDiary[]
 }
 
-model DiaryEntry {
+model DailyDiary {
   id        Int      @id @default(autoincrement())
-  text      String
-  mood      String?
-  tags      String[] @default([])
+  date      DateTime
+  content   String
+  summary   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags      Tag[]
+
+  @@unique([userId, date])
+}
+
+model Tag {
+  id      Int           @id @default(autoincrement())
+  name    String        @unique
+  icon    String
+  color   String
+  diaries DailyDiary[]
 }

@@ -1,0 +1,173 @@
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
+
+const getApiUrl = () => {
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const host = hostUri.split(":")[0];
+    return `http://${host}:5000/api`;
+  }
+  return "http://localhost:5000/api";
+};
+const API_URL = getApiUrl();
+
+type Tag = {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+};
+
+type DiaryEntry = {
+  id: number;
+  date: string;
+  content: string;
+  summary: string;
+  tags: Tag[];
+};
+
+const dayNames = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+];
+const monthNames = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function formatFullDate(isoDate: string): string {
+  const d = new Date(isoDate);
+  return `${dayNames[d.getDay()]}, ${monthNames[d.getMonth()]} ${d.getDate()}`;
+}
+
+type Props = {
+  entry: DiaryEntry;
+  token: string | null;
+  onEdit: () => void;
+  onDelete: () => void;
+};
+
+export default function DiaryCard({ entry, token, onEdit, onDelete }: Props) {
+  const handleDelete = () => {
+    Alert.alert("Delete Entry", "Are you sure you want to delete this entry?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const res = await fetch(`${API_URL}/diary/${entry.id}`, {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error("Delete failed");
+            onDelete();
+          } catch (err: any) {
+            Alert.alert("Error", err.message || "Could not delete entry.");
+          }
+        },
+      },
+    ]);
+  };
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View>
+          <Text style={styles.dateLabel}>Your Entry</Text>
+          <Text style={styles.dateText}>{formatFullDate(entry.date)}</Text>
+        </View>
+        <View style={styles.actions}>
+          <TouchableOpacity onPress={onEdit} style={styles.actionBtn}>
+            <Ionicons name="pencil" size={18} color="#3B82F6" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDelete} style={styles.actionBtn}>
+            <Ionicons name="trash-outline" size={18} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <Text style={styles.content}>{entry.content}</Text>
+
+      {entry.tags.length > 0 && (
+        <View style={styles.tagsRow}>
+          {entry.tags.map((tag) => (
+            <View
+              key={tag.id}
+              style={[styles.tag, { backgroundColor: tag.color }]}
+            >
+              <Text style={styles.tagText}>
+                {tag.icon} {tag.name}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 14,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: "#F59E0B",
+    fontWeight: "600",
+  },
+  dateText: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginTop: 2,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  actionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  content: {
+    fontSize: 14,
+    color: "#374151",
+    lineHeight: 22,
+    marginBottom: 14,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  tag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  tagText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+});
