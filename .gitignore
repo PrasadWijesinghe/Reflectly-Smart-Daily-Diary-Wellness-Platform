@@ -44,5 +44,8 @@ app-example
 /ios
 /android
 
+# audio uploads
+backend/uploads/
+
 
 *.md
