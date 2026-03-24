@@ -1,20 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
-
-const getApiUrl = () => {
-  // In development, Expo exposes the dev server's host (e.g. "192.168.1.5:8081")
-  // We extract just the IP so the app always uses the correct machine address
-  const hostUri = Constants.expoConfig?.hostUri; // e.g. "192.168.1.5:8081"
-  if (hostUri) {
-    const host = hostUri.split(":")[0]; // extract just the IP
-    return `http://${host}:5000/api`;
-  }
-  // Fallback for production or when hostUri is unavailable
-  return "http://localhost:5000/api";
-};
-
-const API_URL = getApiUrl();
+import { getApiUrl } from "../utils/api";
 
 type User = {
   id: number;
@@ -62,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function login(email: string, password: string) {
-    const res = await fetch(`${API_URL}/auth/login`, {
+    const res = await fetch(`${getApiUrl()}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -81,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function register(name: string, email: string, password: string) {
-    const res = await fetch(`${API_URL}/auth/register`, {
+    const res = await fetch(`${getApiUrl()}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password }),

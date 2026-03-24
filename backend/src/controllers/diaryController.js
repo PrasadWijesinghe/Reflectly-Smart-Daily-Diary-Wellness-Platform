@@ -1,20 +1,5 @@
 const prisma = require("../utils/prisma");
-const { analyzeMood } = require("../utils/moodAnalyzer");
-const { analyzeStress } = require("../utils/stressAnalyzer");
-const { analyzeTopic } = require("../utils/topicAnalyzer");
-
-function generateSummary(content) {
-  const trimmed = content.trim();
-  if (!trimmed) return "";
-
-  const sentenceMatch = trimmed.match(/^(.+?[.!?])\s/);
-  if (sentenceMatch && sentenceMatch[1].length <= 120) {
-    return sentenceMatch[1];
-  }
-
-  if (trimmed.length <= 120) return trimmed;
-  return trimmed.substring(0, 120) + "...";
-}
+const { generateAISummary } = require("../utils/gemini");
 
 function normalizeDate(dateStr) {
   if (dateStr) {
@@ -90,10 +75,7 @@ const createEntry = async (req, res) => {
     }
 
     const normalizedDate = normalizeDate(date);
-    const summary = generateSummary(content);
-    const mood = await analyzeMood(summary);
-    const stressLevel = await analyzeStress(summary);
-    const topic = await analyzeTopic(summary);
+    const summary = await generateAISummary(content);
     const tagConnect =
       tagIds && tagIds.length > 0
         ? { connect: tagIds.map((id) => ({ id })) }
@@ -116,9 +98,6 @@ const createEntry = async (req, res) => {
       data: {
         content,
         summary,
-        mood,
-        stressLevel,
-        topic,
         date: normalizedDate,
         userId: req.user.userId,
         ...(tagConnect && { tags: tagConnect }),
@@ -173,10 +152,7 @@ const updateEntry = async (req, res) => {
     const updateData = {};
     if (content !== undefined) {
       updateData.content = content;
-      updateData.summary = generateSummary(content);
-      updateData.mood = await analyzeMood(updateData.summary);
-      updateData.stressLevel = await analyzeStress(updateData.summary);
-      updateData.topic = await analyzeTopic(updateData.summary);
+      updateData.summary = await generateAISummary(content);
     }
     if (tagIds !== undefined) {
       updateData.tags = {

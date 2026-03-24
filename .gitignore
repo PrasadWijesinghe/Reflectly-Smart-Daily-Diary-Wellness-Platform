@@ -49,3 +49,6 @@ backend/uploads/
 
 
 *.md
+
+
+.env
