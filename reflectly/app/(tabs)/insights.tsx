@@ -9,40 +9,118 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import Constants from "expo-constants";
+import { useAuth } from "../../context/AuthContext";
+
+const getApiUrl = () => {
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const host = hostUri.split(":")[0];
+    return `http://${host}:5000/api`;
+  }
+  return "http://localhost:5000/api";
+};
+const API_URL = getApiUrl();
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const MOOD_DATA: Record<string, string> = {
-  Mon: "😊",
-  Tue: "😄",
-  Wed: "😃",
-  Thu: "😓",
-  Fri: "😌",
-  Sat: "😓",
-  Sun: "😡",
+const TOPIC_METADATA: Record<string, { emoji: string; color: string }> = {
+  "Study Sessions": { emoji: "📚", color: "#F59E0B" },
+  "Exam Prep": { emoji: "📝", color: "#10B981" },
+  "Social Time": { emoji: "👥", color: "#06B6D4" },
+  "Self Care": { emoji: "💆", color: "#3B82F6" },
+  "Fitness & Health": { emoji: "🏃", color: "#EF4444" },
+  "Work & Career": { emoji: "💼", color: "#8B5CF6" },
+  "Hobbies & Creativity": { emoji: "🎨", color: "#EC4899" },
+  "Family Time": { emoji: "🏠", color: "#14B8A6" },
+  "Resting": { emoji: "🛌", color: "#6366F1" },
 };
-
-const STRESS_DATA: Record<string, number> = {
-  Mon: 35,
-  Tue: 70,
-  Wed: 50,
-  Thu: 80,
-  Fri: 65,
-  Sat: 30,
-  Sun: 20,
-};
-
-const TOPICS = [
-  { label: "Study Sessions", emoji: "📚", count: 12, color: "#F59E0B", pct: 100 },
-  { label: "Exam Prep", emoji: "📝", count: 8, color: "#10B981", pct: 67 },
-  { label: "Social Time", emoji: "👥", count: 6, color: "#06B6D4", pct: 50 },
-  { label: "Self Care", emoji: "💆", count: 5, color: "#3B82F6", pct: 42 },
-];
 
 export default function InsightsScreen() {
+  const { token } = useAuth();
   const [activeTab, setActiveTab] = useState<"7days" | "30days">("7days");
+  const [moodData, setMoodData] = useState<Record<string, string>>({
+    Mon: "➖", Tue: "➖", Wed: "➖", Thu: "➖", Fri: "➖", Sat: "➖", Sun: "➖",
+  });
+  const [stressData, setStressData] = useState<Record<string, number>>({
+    Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0,
+  });
+  const [topicsData, setTopicsData] = useState<any[]>([]);
 
-  const maxStress = Math.max(...Object.values(STRESS_DATA));
+  React.useEffect(() => {
+    if (token) {
+      fetchEntries();
+    }
+  }, [token]);
+
+  const fetchEntries = async () => {
+    try {
+      const res = await fetch(`${API_URL}/diary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      
+      const newMoodData: Record<string, string> = {
+        Mon: "➖", Tue: "➖", Wed: "➖", Thu: "➖", Fri: "➖", Sat: "➖", Sun: "➖",
+      };
+      const newStressData: Record<string, number> = {
+        Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0,
+      };
+      const topicCounts: Record<string, number> = {};
+      
+      const today = new Date();
+      const pastWeek = new Date();
+      pastWeek.setDate(today.getDate() - 6);
+      pastWeek.setHours(0, 0, 0, 0);
+
+      const DAYS_ARRAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+      data.entries.forEach((entry: any) => {
+        const d = new Date(entry.date);
+        if (d >= pastWeek && d <= today) {
+          const dayName = DAYS_ARRAY[d.getDay()];
+          if (entry.mood) {
+            const emojiMatch = entry.mood.match(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu);
+            if (emojiMatch) {
+              newMoodData[dayName] = emojiMatch[0];
+            }
+          }
+          if (entry.stressLevel !== undefined && entry.stressLevel !== null) {
+            newStressData[dayName] = entry.stressLevel;
+          }
+          if (entry.topic) {
+            topicCounts[entry.topic] = (topicCounts[entry.topic] || 0) + 1;
+          }
+        }
+      });
+      
+      setMoodData(newMoodData);
+      setStressData(newStressData);
+
+      const parsedTopics = Object.keys(topicCounts)
+        .map((topicName) => {
+          const meta = TOPIC_METADATA[topicName] || { emoji: "📌", color: "#9CA3AF" };
+          return {
+            label: topicName,
+            emoji: meta.emoji,
+            count: topicCounts[topicName],
+            color: meta.color,
+            pct: 0,
+          };
+        })
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 6);
+
+      const maxCount = parsedTopics.length > 0 ? parsedTopics[0].count : 1;
+      parsedTopics.forEach((t) => {
+        t.pct = Math.round((t.count / maxCount) * 100);
+      });
+      setTopicsData(parsedTopics);
+    } catch (err) {
+      console.error("Fetch insights entries error:", err);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -153,7 +231,7 @@ export default function InsightsScreen() {
           <View style={styles.moodRow}>
             {DAYS.map((day) => (
               <View key={day} style={styles.moodItem}>
-                <Text style={styles.moodEmoji}>{MOOD_DATA[day]}</Text>
+                <Text style={styles.moodEmoji}>{moodData[day]}</Text>
                 <Text style={styles.moodDay}>{day}</Text>
               </View>
             ))}
@@ -168,7 +246,8 @@ export default function InsightsScreen() {
           </View>
           <View style={styles.stressChart}>
             {DAYS.map((day) => {
-              const val = STRESS_DATA[day];
+              const val = stressData[day] || 0;
+              const maxStress = 100;
               const height = (val / maxStress) * 80;
               const isHigh = val >= 65;
               return (
@@ -202,7 +281,9 @@ export default function InsightsScreen() {
             <Text style={{ fontSize: 16 }}>✏️</Text>
             <Text style={styles.cardTitle}>What You Wrote About</Text>
           </View>
-          {TOPICS.map((topic, index) => (
+          {topicsData.length === 0 ? (
+            <Text style={{ textAlign: "center", color: "#9CA3AF", marginTop: 10 }}>No topics categorized this week.</Text>
+          ) : topicsData.map((topic, index) => (
             <View key={index} style={styles.topicRow}>
               <View style={styles.topicLabel}>
                 <Text style={{ fontSize: 16 }}>{topic.emoji}</Text>
