@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -50,7 +49,6 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const firstName = user?.name?.split(" ")[0] || "there";
-  const screenWidth = Dimensions.get("window").width;
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -98,9 +96,9 @@ export default function HomeScreen() {
             <View className="flex-row items-center justify-between mb-3">
               <View className="flex-row items-center">
                 <Ionicons name="calendar-outline" size={16} color="white" />
-                <Text className="text-white font-semibold text-sm ml-1.5">
-                  This Week's Vibe
-                </Text>
+              <Text className="text-white font-semibold text-sm ml-1.5">
+                This Week&apos;s Vibe
+              </Text>
               </View>
               <View className="bg-white/25 rounded-full px-3 py-1">
                 <Text className="text-white text-xs font-medium">
@@ -161,7 +159,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             <Text className="text-gray-400 text-xs mb-4">
-              Let's keep an eye on this!
+              Let&apos;s keep an eye on this!
             </Text>
 
             {/* Stress bar labels */}
