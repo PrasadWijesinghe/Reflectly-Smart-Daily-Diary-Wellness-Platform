@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import { getApiUrl } from "../../utils/api";
 import DiaryEditor from "../../components/DiaryEditor";
@@ -56,6 +57,7 @@ function formatDate(isoDate: string): string {
 
 export default function DiaryScreen() {
   const { token } = useAuth();
+  const router = useRouter();
   const today = toDateString(new Date());
 
   const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
@@ -293,9 +295,9 @@ export default function DiaryScreen() {
             <Text style={{ fontSize: 14, marginRight: 6 }}>🕐</Text>
             <Text style={styles.pastTitle}>Past Entries</Text>
           </View>
-          <TouchableOpacity>
-            <Text style={styles.viewAllText}>View All</Text>
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/viewall-diary")}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
         </View>
 
         {loadingPast ? (
