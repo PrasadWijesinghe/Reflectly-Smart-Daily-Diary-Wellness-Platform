@@ -126,7 +126,6 @@ export default function InsightsScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      {/* Header */}
       <LinearGradient
         colors={["#3B82F6", "#2563EB", "#1D4ED8"]}
         style={styles.header}
@@ -151,7 +150,6 @@ export default function InsightsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* 7 Days / 30 Days Toggle */}
         <View style={styles.toggleContainer}>
           <TouchableOpacity
             style={[
@@ -199,7 +197,6 @@ export default function InsightsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Weekly Summary */}
         <LinearGradient
           colors={["#3B82F6", "#6366F1", "#7C3AED"]}
           start={{ x: 0, y: 0 }}
@@ -222,7 +219,6 @@ export default function InsightsScreen() {
           </Text>
         </LinearGradient>
 
-        {/* Mood Trend */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={{ fontSize: 16 }}>😊</Text>
@@ -238,7 +234,6 @@ export default function InsightsScreen() {
           </View>
         </View>
 
-        {/* Stress Levels */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={{ fontSize: 16 }}>😰</Text>
@@ -275,7 +270,6 @@ export default function InsightsScreen() {
           </View>
         </View>
 
-        {/* What You Wrote About */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={{ fontSize: 16 }}>✏️</Text>
@@ -305,25 +299,23 @@ export default function InsightsScreen() {
           ))}
         </View>
 
-        {/* Highlights & Focus Area */}
         <View style={styles.twoColRow}>
           <View style={[styles.highlightCard, { backgroundColor: "#FFFBEB" }]}>
             <Text style={{ fontSize: 22, marginBottom: 8 }}>🏆</Text>
-            <Text style={styles.highlightTitle}>Highlights</Text>
+            <Text style={styles.highlightTitle}>Resilience Master!</Text>
             <Text style={styles.highlightSub}>
-              Completed 3 major assignments!
+              You bounced back! Stress was high on Tue, but improved by Thu.
             </Text>
           </View>
           <View style={[styles.highlightCard, { backgroundColor: "#F0F5FF" }]}>
             <Text style={{ fontSize: 22, marginBottom: 8 }}>🎯</Text>
-            <Text style={styles.highlightTitle}>Focus Area</Text>
+            <Text style={styles.highlightTitle}>Exam Anxiety Peak</Text>
             <Text style={styles.highlightSub}>
-              Time management during exams
+              Stress levels consistently spike 2 days before a deadline.
             </Text>
           </View>
         </View>
 
-        {/* Tips for You */}
         <View style={styles.sectionHeader}>
           <Text style={{ fontSize: 14 }}>✨</Text>
           <Text style={styles.sectionTitle}>Tips for You</Text>
@@ -337,6 +329,30 @@ export default function InsightsScreen() {
             <Text style={styles.tipTitle}>Sleep Better</Text>
             <Text style={styles.tipSub}>
               Your mood is better on days with 7+ hours of sleep!
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.tipCard}>
+          <View style={[styles.tipIconWrap, { backgroundColor: "#FEE2E2" }]}>
+            <Text style={{ fontSize: 18 }}>🍅</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tipTitle}>Try the Pomodoro Technique</Text>
+            <Text style={styles.tipSub}>
+              Break your study sessions into 25-minute chunks to maintain focus.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.tipCard}>
+          <View style={[styles.tipIconWrap, { backgroundColor: "#E0E7FF" }]}>
+            <Text style={{ fontSize: 18 }}>🧘</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tipTitle}>Box Breathing Reset</Text>
+            <Text style={styles.tipSub}>
+              Feeling overwhelmed? Breathe in for 4s, hold for 4s, out for 4s.
             </Text>
           </View>
         </View>
@@ -615,6 +631,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
+    marginBottom: 12,
   },
   tipIconWrap: {
     width: 40,
