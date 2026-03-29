@@ -12,17 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
-import Constants from "expo-constants";
-
-const getApiUrl = () => {
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (hostUri) {
-    const host = hostUri.split(":")[0];
-    return `http://${host}:5000/api`;
-  }
-  return "http://localhost:5000/api";
-};
-const API_URL = getApiUrl();
+import { getApiUrl } from "../utils/api";
 
 type RecordingState = "idle" | "recording" | "processing";
 
@@ -79,8 +69,8 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       const url = entry
-        ? `${API_URL}/diary/${entry.id}`
-        : `${API_URL}/diary`;
+        ? `${getApiUrl()}/diary/${entry.id}`
+        : `${getApiUrl()}/diary`;
       const method = entry ? "PUT" : "POST";
 
       const body: any = {
@@ -209,7 +199,7 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
         type: "audio/m4a",
       } as any);
 
-      const res = await fetch(`${API_URL}/transcribe`, {
+      const res = await fetch(`${getApiUrl()}/transcribe`, {
         method: "POST",
         body: formData,
         headers: { "Content-Type": "multipart/form-data" },
