@@ -52,4 +52,11 @@ backend/uploads/
 
 *.md
 
+
 .env
+
+
+.env
+
+backend/.env
+
