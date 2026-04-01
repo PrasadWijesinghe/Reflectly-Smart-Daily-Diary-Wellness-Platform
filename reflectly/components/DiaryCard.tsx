@@ -1,7 +1,8 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getApiUrl } from "../utils/api";
+import DeleteConfirmModal from "./DeleteConfirmModal";
 
 type Tag = {
   id: number;
@@ -39,62 +40,67 @@ type Props = {
 };
 
 export default function DiaryCard({ entry, token, onEdit, onDelete }: Props) {
-  const handleDelete = () => {
-    Alert.alert("Delete Entry", "Are you sure you want to delete this entry?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const res = await fetch(`${getApiUrl()}/diary/${entry.id}`, {
-              method: "DELETE",
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) throw new Error("Delete failed");
-            onDelete();
-          } catch (err: any) {
-            Alert.alert("Error", err.message || "Could not delete entry.");
-          }
-        },
-      },
-    ]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    setShowDeleteModal(false);
+    try {
+      const res = await fetch(`${getApiUrl()}/diary/${entry.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      onDelete();
+    } catch (err: any) {
+      console.error("Delete error:", err);
+    }
   };
 
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View>
-          <Text style={styles.dateLabel}>Your Entry</Text>
-          <Text style={styles.dateText}>{formatFullDate(entry.date)}</Text>
+    <>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View>
+            <Text style={styles.dateLabel}>Your Entry</Text>
+            <Text style={styles.dateText}>{formatFullDate(entry.date)}</Text>
+          </View>
+          <View style={styles.actions}>
+            <TouchableOpacity onPress={onEdit} style={styles.actionBtn}>
+              <Ionicons name="pencil" size={18} color="#3B82F6" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowDeleteModal(true)}
+              style={styles.actionBtn}
+            >
+              <Ionicons name="trash-outline" size={18} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.actions}>
-          <TouchableOpacity onPress={onEdit} style={styles.actionBtn}>
-            <Ionicons name="pencil" size={18} color="#3B82F6" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleDelete} style={styles.actionBtn}>
-            <Ionicons name="trash-outline" size={18} color="#EF4444" />
-          </TouchableOpacity>
-        </View>
+
+        <Text style={styles.content}>{entry.content}</Text>
+
+        {entry.tags.length > 0 && (
+          <View style={styles.tagsRow}>
+            {entry.tags.map((tag) => (
+              <View
+                key={tag.id}
+                style={[styles.tag, { backgroundColor: tag.color }]}
+              >
+                <Text style={styles.tagText}>
+                  {tag.icon} {tag.name}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
 
-      <Text style={styles.content}>{entry.content}</Text>
-
-      {entry.tags.length > 0 && (
-        <View style={styles.tagsRow}>
-          {entry.tags.map((tag) => (
-            <View
-              key={tag.id}
-              style={[styles.tag, { backgroundColor: tag.color }]}
-            >
-              <Text style={styles.tagText}>
-                {tag.icon} {tag.name}
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
+      <DeleteConfirmModal
+        visible={showDeleteModal}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setShowDeleteModal(false)}
+      />
+    </>
   );
 }
 
