@@ -2,18 +2,8 @@ import React, { useState } from "react";
 import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import Constants from "expo-constants";
 import { useAuth } from "../../context/AuthContext";
-
-const getApiUrl = () => {
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (hostUri) {
-    const host = hostUri.split(":")[0];
-    return `http://${host}:5000/api`;
-  }
-  return "http://localhost:5000/api";
-};
-const API_URL = getApiUrl();
+import { getApiUrl } from "../../utils/api";
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const EMPTY_MOODS: Record<string, string> = { Mon: "—", Tue: "—", Wed: "—", Thu: "—", Fri: "—", Sat: "—", Sun: "—" };
 const EMPTY_STRESS: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
@@ -30,7 +20,7 @@ export default function InsightsScreen() {
 
     async function fetchEntries() {
       try {
-        const res = await fetch(`${API_URL}/diary`, {
+        const res = await fetch(`${getApiUrl()}/diary`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return;

@@ -16,7 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
-import { getApiUrl } from "../../utils/api";
+import { fetchWithTimeout, getApiUrl } from "../../utils/api";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -68,7 +68,7 @@ export default function LoginScreen() {
 
     setSendingForgotOtp(true);
     try {
-      const res = await fetch(`${getApiUrl()}/auth/forgot-password/send-otp`, {
+      const res = await fetchWithTimeout(`${getApiUrl()}/auth/forgot-password/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: normalizedEmail }),
@@ -107,7 +107,7 @@ export default function LoginScreen() {
 
     setVerifyingForgotOtp(true);
     try {
-      const res = await fetch(`${getApiUrl()}/auth/forgot-password/verify-otp`, {
+      const res = await fetchWithTimeout(`${getApiUrl()}/auth/forgot-password/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: normalizedEmail, otp: forgotOtp.trim() }),
@@ -150,7 +150,7 @@ export default function LoginScreen() {
 
     setResettingPassword(true);
     try {
-      const res = await fetch(`${getApiUrl()}/auth/forgot-password/reset`, {
+      const res = await fetchWithTimeout(`${getApiUrl()}/auth/forgot-password/reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

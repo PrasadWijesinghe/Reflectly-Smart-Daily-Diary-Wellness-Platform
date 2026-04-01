@@ -12,8 +12,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import Constants from "expo-constants";
 import { useAuth } from "../../context/AuthContext";
+import { getApiUrl } from "../../utils/api";
 
 type SettingRow = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -81,15 +81,6 @@ const SUPPORT: SettingRow[] = [
     label: "Send Feedback",
   },
 ];
-
-function getApiUrl() {
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (hostUri) {
-    const host = hostUri.split(":")[0];
-    return `http://${host}:5000/api`;
-  }
-  return "http://localhost:5000/api";
-}
 
 function formatMemberSince(createdAt?: string) {
   if (!createdAt) return "Member since recently";
@@ -169,8 +160,6 @@ export default function ProfileScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_URL = getApiUrl();
-
   async function loadProfileData(showRefresh = false) {
     if (!token) {
       setProfile(null);
@@ -191,8 +180,8 @@ export default function ProfileScreen() {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [meRes, diaryRes] = await Promise.all([
-        fetch(`${API_URL}/auth/me`, { headers }),
-        fetch(`${API_URL}/diary`, { headers }),
+        fetch(`${getApiUrl()}/auth/me`, { headers }),
+        fetch(`${getApiUrl()}/diary`, { headers }),
       ]);
 
       const meData = await meRes.json();

@@ -129,7 +129,10 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
       const res = await fetch(`${getApiUrl()}/transcribe`, {
         method: "POST",
         body: formData,
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!res.ok) {

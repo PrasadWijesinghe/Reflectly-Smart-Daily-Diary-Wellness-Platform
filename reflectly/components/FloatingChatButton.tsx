@@ -14,21 +14,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import Constants from "expo-constants";
 import { useAuth } from "../context/AuthContext";
+import { getApiUrl } from "../utils/api";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-const getApiUrl = () => {
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (hostUri) {
-    const host = hostUri.split(":")[0];
-    return `http://${host}:5000/api`;
-  }
-  return "http://localhost:5000/api";
-};
-
-const API_URL = getApiUrl();
 
 type Message = {
   id: number;
@@ -108,7 +97,7 @@ export default function FloatingChatButton() {
     setIsSending(true);
 
     try {
-      const res = await fetch(`${API_URL}/chat`, {
+      const res = await fetch(`${getApiUrl()}/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
