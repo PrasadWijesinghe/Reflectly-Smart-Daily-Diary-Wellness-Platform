@@ -82,7 +82,11 @@ export default function InsightsScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={["#3B82F6", "#2563EB", "#1D4ED8"]} style={styles.header}>
+
+      <LinearGradient
+        colors={["#3B82F6", "#2563EB", "#1D4ED8"]}
+        style={styles.header}
+      >
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
             <View style={styles.headerIcon}>
@@ -96,7 +100,11 @@ export default function InsightsScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
         <View style={styles.toggleContainer}>
           <TouchableOpacity style={[styles.toggleButton, activeTab === "7days" && styles.toggleButtonActive]} onPress={() => setActiveTab("7days")}>
             <Ionicons name="calendar-outline" size={16} color={activeTab === "7days" ? "#FFFFFF" : "#6B7280"} style={{ marginRight: 6 }} />
@@ -108,7 +116,12 @@ export default function InsightsScreen() {
           </TouchableOpacity>
         </View>
 
-        <LinearGradient colors={["#3B82F6", "#6366F1", "#7C3AED"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.summaryCard}>
+        <LinearGradient
+          colors={["#3B82F6", "#6366F1", "#7C3AED"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.summaryCard}
+        >
           <View style={styles.summaryHeader}>
             <View style={styles.summaryIconWrap}>
               <Ionicons name="analytics-outline" size={20} color="#FFFFFF" />
@@ -186,6 +199,23 @@ export default function InsightsScreen() {
           )}
         </View>
 
+        <View style={styles.twoColRow}>
+          <View style={[styles.highlightCard, { backgroundColor: "#FFFBEB" }]}>
+            <Text style={{ fontSize: 22, marginBottom: 8 }}>🏆</Text>
+            <Text style={styles.highlightTitle}>Resilience Master!</Text>
+            <Text style={styles.highlightSub}>
+              You bounced back! Stress was high on Tue, but improved by Thu.
+            </Text>
+          </View>
+          <View style={[styles.highlightCard, { backgroundColor: "#F0F5FF" }]}>
+            <Text style={{ fontSize: 22, marginBottom: 8 }}>🎯</Text>
+            <Text style={styles.highlightTitle}>Exam Anxiety Peak</Text>
+            <Text style={styles.highlightSub}>
+              Stress levels consistently spike 2 days before a deadline.
+            </Text>
+          </View>
+        </View>
+
         <View style={styles.sectionHeader}>
           <Text style={{ fontSize: 14 }}>✨</Text>
           <Text style={styles.sectionTitle}>Tips for You</Text>
@@ -199,12 +229,328 @@ export default function InsightsScreen() {
             <Text style={styles.tipSub}>Consistent entries make your mood and topic trends much more useful.</Text>
           </View>
         </View>
+
+        <View style={styles.tipCard}>
+          <View style={[styles.tipIconWrap, { backgroundColor: "#FEE2E2" }]}>
+            <Text style={{ fontSize: 18 }}>🍅</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tipTitle}>Try the Pomodoro Technique</Text>
+            <Text style={styles.tipSub}>
+              Break your study sessions into 25-minute chunks to maintain focus.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.tipCard}>
+          <View style={[styles.tipIconWrap, { backgroundColor: "#E0E7FF" }]}>
+            <Text style={{ fontSize: 18 }}>🧘</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tipTitle}>Box Breathing Reset</Text>
+            <Text style={styles.tipSub}>
+              Feeling overwhelmed? Breathe in for 4s, hold for 4s, out for 4s.
+            </Text>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+
+  container: {
+    flex: 1,
+    backgroundColor: "#F0F5FF",
+  },
+  header: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 2,
+  },
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    backgroundColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 4,
+    marginTop: 16,
+  },
+  toggleButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  toggleButtonActive: {
+    backgroundColor: "#3B82F6",
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  toggleTextActive: {
+    color: "#FFFFFF",
+  },
+  summaryCard: {
+    borderRadius: 16,
+    padding: 18,
+    marginTop: 16,
+  },
+  summaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  summaryIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 1,
+  },
+  summaryText: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.9)",
+    lineHeight: 20,
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 18,
+    marginTop: 16,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    gap: 8,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  moodRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  moodItem: {
+    alignItems: "center",
+    gap: 8,
+  },
+  moodEmoji: {
+    fontSize: 24,
+  },
+  moodDay: {
+    fontSize: 11,
+    color: "#9CA3AF",
+    fontWeight: "600",
+  },
+  stressChart: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    height: 100,
+    paddingHorizontal: 4,
+  },
+  stressBarWrap: {
+    alignItems: "center",
+    flex: 1,
+  },
+  stressBarBg: {
+    width: 20,
+    height: 80,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 10,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+  },
+  stressBar: {
+    width: "100%",
+    borderRadius: 10,
+  },
+  stressDay: {
+    fontSize: 11,
+    color: "#9CA3AF",
+    fontWeight: "600",
+    marginTop: 8,
+  },
+  stressTip: {
+    backgroundColor: "#FFFBEB",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: 16,
+    alignItems: "center",
+  },
+  stressTipText: {
+    fontSize: 12,
+    color: "#F59E0B",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  topicRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    gap: 10,
+  },
+  topicLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: 130,
+    gap: 8,
+  },
+  topicName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1F2937",
+  },
+  topicBarWrap: {
+    flex: 1,
+    height: 8,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  topicBar: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  topicCount: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#9CA3AF",
+    width: 28,
+    textAlign: "right",
+  },
+  twoColRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 16,
+  },
+  highlightCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 18,
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+  },
+  highlightTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 4,
+  },
+  highlightSub: {
+    fontSize: 12,
+    color: "#6B7280",
+    lineHeight: 16,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 22,
+    marginBottom: 12,
+    gap: 6,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  tipCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    marginBottom: 12,
+  },
+  tipIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F5F3FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tipTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  tipSub: {
+    fontSize: 12,
+    color: "#3B82F6",
+    marginTop: 2,
+    lineHeight: 16,
+  },
+
   container: { flex: 1, backgroundColor: "#F0F5FF" },
   header: { paddingTop: 50, paddingBottom: 20, paddingHorizontal: 20 },
   headerContent: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -250,4 +596,5 @@ const styles = StyleSheet.create({
   tipIconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#F5F3FF", alignItems: "center", justifyContent: "center" },
   tipTitle: { fontSize: 14, fontWeight: "700", color: "#1F2937" },
   tipSub: { fontSize: 12, color: "#3B82F6", marginTop: 2, lineHeight: 16 },
+
 });
