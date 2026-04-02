@@ -4,6 +4,8 @@ const {
   getEntries,
   getEntry,
   getEntryDates,
+  getMoodTrend,
+  getWeekMoods,
   updateEntry,
   deleteEntry,
 } = require("../controllers/diaryController");
@@ -14,6 +16,8 @@ const router = express.Router();
 // All diary routes require authentication
 router.use(authenticate);
 
+router.get("/mood-trend", getMoodTrend);
+router.get("/week-moods", getWeekMoods);
 router.get("/dates", getEntryDates);
 router.post("/", createEntry);
 router.get("/", getEntries);
