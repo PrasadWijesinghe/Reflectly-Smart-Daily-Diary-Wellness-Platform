@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getApiUrl } from "../utils/api";
+import { fetchWithTimeout, getApiUrl } from "../utils/api";
 
 type User = {
   id: number;
@@ -13,7 +13,8 @@ type AuthContextType = {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  sendRegistrationOtp: (email: string) => Promise<void>;
+  register: (name: string, email: string, password: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function login(email: string, password: string) {
-    const res = await fetch(`${getApiUrl()}/auth/login`, {
+    const res = await fetchWithTimeout(`${getApiUrl()}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -66,11 +67,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   }
 
-  async function register(name: string, email: string, password: string) {
-    const res = await fetch(`${getApiUrl()}/auth/register`, {
+  async function sendRegistrationOtp(email: string) {
+    const res = await fetchWithTimeout(`${getApiUrl()}/auth/send-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to send OTP");
+    }
+  }
+
+  async function register(name: string, email: string, password: string, otp: string) {
+    const res = await fetchWithTimeout(`${getApiUrl()}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, otp }),
     });
 
     const data = await res.json();
@@ -93,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, sendRegistrationOtp, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

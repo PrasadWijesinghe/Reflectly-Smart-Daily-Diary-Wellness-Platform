@@ -1,7 +1,6 @@
 const prisma = require("../utils/prisma");
 
-// GET /api/tags
-const getTags = async (req, res) => {
+async function getTags(req, res) {
   try {
     const tags = await prisma.tag.findMany({
       orderBy: { name: "asc" },
@@ -12,10 +11,9 @@ const getTags = async (req, res) => {
     console.error("GetTags error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
-};
+}
 
-// POST /api/tags
-const createTag = async (req, res) => {
+async function createTag(req, res) {
   try {
     const { name, icon, color } = req.body;
 
@@ -37,13 +35,12 @@ const createTag = async (req, res) => {
     console.error("CreateTag error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
-};
+}
 
-// PUT /api/tags/:id
-const updateTag = async (req, res) => {
+async function updateTag(req, res) {
   try {
     const { name, icon, color } = req.body;
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
 
     const existing = await prisma.tag.findUnique({ where: { id } });
     if (!existing) {
@@ -64,12 +61,11 @@ const updateTag = async (req, res) => {
     console.error("UpdateTag error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
-};
+}
 
-// DELETE /api/tags/:id
-const deleteTag = async (req, res) => {
+async function deleteTag(req, res) {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
 
     const existing = await prisma.tag.findUnique({ where: { id } });
     if (!existing) {
@@ -83,6 +79,6 @@ const deleteTag = async (req, res) => {
     console.error("DeleteTag error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
-};
+}
 
 module.exports = { getTags, createTag, updateTag, deleteTag };

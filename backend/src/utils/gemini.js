@@ -35,7 +35,7 @@ async function generateAISummary(content) {
               role: "user",
               parts: [
                 {
-                  text: `Summarize this diary entry in one concise sentence (max 20 words). Return only the summary, nothing else.\n\nDiary entry:\n${content}`,
+                  text: `Summarize this diary entry in one concise sentence (max 5 words). Return only the summary, nothing else.\n\nDiary entry:\n${content}`,
                 },
               ],
             },
