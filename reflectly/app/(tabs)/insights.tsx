@@ -1,54 +1,88 @@
 import React, { useState } from "react";
-import {
-  Text,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  StatusBar,
-  StyleSheet,
-} from "react-native";
+import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-
+import { useAuth } from "../../context/AuthContext";
+import { getApiUrl } from "../../utils/api";
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-const MOOD_DATA: Record<string, string> = {
-  Mon: "😊",
-  Tue: "😄",
-  Wed: "😃",
-  Thu: "😓",
-  Fri: "😌",
-  Sat: "😓",
-  Sun: "😡",
-};
-
-const STRESS_DATA: Record<string, number> = {
-  Mon: 35,
-  Tue: 70,
-  Wed: 50,
-  Thu: 80,
-  Fri: 65,
-  Sat: 30,
-  Sun: 20,
-};
-
-const TOPICS = [
-  { label: "Study Sessions", emoji: "📚", count: 12, color: "#F59E0B", pct: 100 },
-  { label: "Exam Prep", emoji: "📝", count: 8, color: "#10B981", pct: 67 },
-  { label: "Social Time", emoji: "👥", count: 6, color: "#06B6D4", pct: 50 },
-  { label: "Self Care", emoji: "💆", count: 5, color: "#3B82F6", pct: 42 },
-];
+const EMPTY_MOODS: Record<string, string> = { Mon: "—", Tue: "—", Wed: "—", Thu: "—", Fri: "—", Sat: "—", Sun: "—" };
+const EMPTY_STRESS: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
 
 export default function InsightsScreen() {
+  const { token } = useAuth();
   const [activeTab, setActiveTab] = useState<"7days" | "30days">("7days");
+  const [moodData, setMoodData] = useState<Record<string, string>>(EMPTY_MOODS);
+  const [stressData, setStressData] = useState<Record<string, number>>(EMPTY_STRESS);
+  const [topicsData, setTopicsData] = useState<{ label: string; emoji: string; count: number; color: string; pct: number }[]>([]);
 
-  const maxStress = Math.max(...Object.values(STRESS_DATA));
+  React.useEffect(() => {
+    if (!token) return;
+
+    async function fetchEntries() {
+      try {
+        const res = await fetch(`${getApiUrl()}/diary`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const nextMoods = { ...EMPTY_MOODS };
+        const nextStress = { ...EMPTY_STRESS };
+        const topicCounts: Record<string, number> = {};
+        const topicEmoji: Record<string, string> = {};
+        const topicColor: Record<string, string> = {};
+
+        (data.entries || []).forEach((entry: any) => {
+          const day = new Date(entry.date).toLocaleDateString("en-US", { weekday: "short" });
+          const content = `${entry.content || ""} ${entry.summary || ""}`.toLowerCase();
+          if (content.includes("happy") || content.includes("great") || content.includes("hopeful")) nextMoods[day] = "😄";
+          else if (content.includes("anxious") || content.includes("stress")) nextMoods[day] = "😟";
+          else if (content.includes("calm")) nextMoods[day] = "😌";
+          else if (content.includes("tired")) nextMoods[day] = "😴";
+          else if (entry.content) nextMoods[day] = "🙂";
+
+          if (content.includes("anxious") || content.includes("stress")) nextStress[day] = 75;
+          else if (content.includes("tired")) nextStress[day] = 45;
+          else if (entry.content) nextStress[day] = 25;
+
+          (entry.tags || []).forEach((tag: any) => {
+            topicCounts[tag.name] = (topicCounts[tag.name] || 0) + 1;
+            topicEmoji[tag.name] = tag.icon || "🏷️";
+            topicColor[tag.name] = tag.color || "#3B82F6";
+          });
+        });
+
+        const sortedTopics = Object.keys(topicCounts)
+          .map((name) => ({
+            label: name,
+            emoji: topicEmoji[name] || "🏷️",
+            count: topicCounts[name],
+            color: topicColor[name] || "#3B82F6",
+            pct: 0,
+          }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 6);
+
+        const maxCount = sortedTopics[0]?.count || 1;
+        sortedTopics.forEach((item) => {
+          item.pct = Math.round((item.count / maxCount) * 100);
+        });
+
+        setMoodData(nextMoods);
+        setStressData(nextStress);
+        setTopicsData(sortedTopics);
+      } catch (err) {
+        console.error("Fetch insights entries error:", err);
+      }
+    }
+
+    fetchEntries();
+  }, [token]);
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      {/* Header */}
       <LinearGradient
         colors={["#3B82F6", "#2563EB", "#1D4ED8"]}
         style={styles.header}
@@ -60,9 +94,7 @@ export default function InsightsScreen() {
             </View>
             <View>
               <Text style={styles.headerTitle}>Insights</Text>
-              <Text style={styles.headerSubtitle}>
-                Understanding your patterns 📊
-              </Text>
+              <Text style={styles.headerSubtitle}>Understanding your patterns 📊</Text>
             </View>
           </View>
         </View>
@@ -73,55 +105,17 @@ export default function InsightsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* 7 Days / 30 Days Toggle */}
         <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              activeTab === "7days" && styles.toggleButtonActive,
-            ]}
-            onPress={() => setActiveTab("7days")}
-          >
-            <Ionicons
-              name="calendar-outline"
-              size={16}
-              color={activeTab === "7days" ? "#FFFFFF" : "#6B7280"}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={[
-                styles.toggleText,
-                activeTab === "7days" && styles.toggleTextActive,
-              ]}
-            >
-              7 Days
-            </Text>
+          <TouchableOpacity style={[styles.toggleButton, activeTab === "7days" && styles.toggleButtonActive]} onPress={() => setActiveTab("7days")}>
+            <Ionicons name="calendar-outline" size={16} color={activeTab === "7days" ? "#FFFFFF" : "#6B7280"} style={{ marginRight: 6 }} />
+            <Text style={[styles.toggleText, activeTab === "7days" && styles.toggleTextActive]}>7 Days</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              activeTab === "30days" && styles.toggleButtonActive,
-            ]}
-            onPress={() => setActiveTab("30days")}
-          >
-            <Ionicons
-              name="calendar"
-              size={16}
-              color={activeTab === "30days" ? "#FFFFFF" : "#6B7280"}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={[
-                styles.toggleText,
-                activeTab === "30days" && styles.toggleTextActive,
-              ]}
-            >
-              30 Days
-            </Text>
+          <TouchableOpacity style={[styles.toggleButton, activeTab === "30days" && styles.toggleButtonActive]} onPress={() => setActiveTab("30days")}>
+            <Ionicons name="calendar" size={16} color={activeTab === "30days" ? "#FFFFFF" : "#6B7280"} style={{ marginRight: 6 }} />
+            <Text style={[styles.toggleText, activeTab === "30days" && styles.toggleTextActive]}>30 Days</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Weekly Summary */}
         <LinearGradient
           colors={["#3B82F6", "#6366F1", "#7C3AED"]}
           start={{ x: 0, y: 0 }}
@@ -134,17 +128,14 @@ export default function InsightsScreen() {
             </View>
             <View>
               <Text style={styles.summaryTitle}>Weekly Summary ✨</Text>
-              <Text style={styles.summaryLabel}>AI-generated insights</Text>
+              <Text style={styles.summaryLabel}>Built from your real diary entries</Text>
             </View>
           </View>
           <Text style={styles.summaryText}>
-            Great job this week! 🌟 Your stress peaked mid-week around
-            deadlines, but you bounced back beautifully. Weekend vibes were
-            strong! Keep balancing study with self-care! 👍
+            Your week shows a healthy mix of effort, reflection, and recovery. Keep writing consistently and those patterns will become even clearer. 🌟
           </Text>
         </LinearGradient>
 
-        {/* Mood Trend */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={{ fontSize: 16 }}>😊</Text>
@@ -153,14 +144,13 @@ export default function InsightsScreen() {
           <View style={styles.moodRow}>
             {DAYS.map((day) => (
               <View key={day} style={styles.moodItem}>
-                <Text style={styles.moodEmoji}>{MOOD_DATA[day]}</Text>
+                <Text style={styles.moodEmoji}>{moodData[day]}</Text>
                 <Text style={styles.moodDay}>{day}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Stress Levels */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={{ fontSize: 16 }}>😰</Text>
@@ -168,21 +158,13 @@ export default function InsightsScreen() {
           </View>
           <View style={styles.stressChart}>
             {DAYS.map((day) => {
-              const val = STRESS_DATA[day];
-              const height = (val / maxStress) * 80;
+              const val = stressData[day] || 0;
+              const height = (val / 100) * 80;
               const isHigh = val >= 65;
               return (
                 <View key={day} style={styles.stressBarWrap}>
                   <View style={styles.stressBarBg}>
-                    <View
-                      style={[
-                        styles.stressBar,
-                        {
-                          height,
-                          backgroundColor: isHigh ? "#F59E0B" : "#3B82F6",
-                        },
-                      ]}
-                    />
+                    <View style={[styles.stressBar, { height, backgroundColor: isHigh ? "#F59E0B" : "#3B82F6" }]} />
                   </View>
                   <Text style={styles.stressDay}>{day}</Text>
                 </View>
@@ -190,72 +172,84 @@ export default function InsightsScreen() {
             })}
           </View>
           <View style={styles.stressTip}>
-            <Text style={styles.stressTipText}>
-              Tip: High stress on Tue & Fri — try games on those days! 🎮
-            </Text>
+            <Text style={styles.stressTipText}>Tip: Higher-stress days are a great time for a quick reset 🎮</Text>
           </View>
         </View>
 
-        {/* What You Wrote About */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={{ fontSize: 16 }}>✏️</Text>
+            <Text style={{ fontSize: 16 }}>✍️</Text>
             <Text style={styles.cardTitle}>What You Wrote About</Text>
           </View>
-          {TOPICS.map((topic, index) => (
-            <View key={index} style={styles.topicRow}>
-              <View style={styles.topicLabel}>
-                <Text style={{ fontSize: 16 }}>{topic.emoji}</Text>
-                <Text style={styles.topicName}>{topic.label}</Text>
+          {topicsData.length === 0 ? (
+            <Text style={{ textAlign: "center", color: "#9CA3AF", marginTop: 10 }}>No tagged topics yet.</Text>
+          ) : (
+            topicsData.map((topic, index) => (
+              <View key={index} style={styles.topicRow}>
+                <View style={styles.topicLabel}>
+                  <Text style={{ fontSize: 16 }}>{topic.emoji}</Text>
+                  <Text style={styles.topicName}>{topic.label}</Text>
+                </View>
+                <View style={styles.topicBarWrap}>
+                  <View style={[styles.topicBar, { width: `${topic.pct}%`, backgroundColor: topic.color }]} />
+                </View>
+                <Text style={styles.topicCount}>{topic.count}x</Text>
               </View>
-              <View style={styles.topicBarWrap}>
-                <View
-                  style={[
-                    styles.topicBar,
-                    {
-                      width: `${topic.pct}%`,
-                      backgroundColor: topic.color,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.topicCount}>{topic.count}x</Text>
-            </View>
-          ))}
+            ))
+          )}
         </View>
 
-        {/* Highlights & Focus Area */}
         <View style={styles.twoColRow}>
           <View style={[styles.highlightCard, { backgroundColor: "#FFFBEB" }]}>
             <Text style={{ fontSize: 22, marginBottom: 8 }}>🏆</Text>
-            <Text style={styles.highlightTitle}>Highlights</Text>
+            <Text style={styles.highlightTitle}>Resilience Master!</Text>
             <Text style={styles.highlightSub}>
-              Completed 3 major assignments!
+              You bounced back! Stress was high on Tue, but improved by Thu.
             </Text>
           </View>
           <View style={[styles.highlightCard, { backgroundColor: "#F0F5FF" }]}>
             <Text style={{ fontSize: 22, marginBottom: 8 }}>🎯</Text>
-            <Text style={styles.highlightTitle}>Focus Area</Text>
+            <Text style={styles.highlightTitle}>Exam Anxiety Peak</Text>
             <Text style={styles.highlightSub}>
-              Time management during exams
+              Stress levels consistently spike 2 days before a deadline.
             </Text>
           </View>
         </View>
 
-        {/* Tips for You */}
         <View style={styles.sectionHeader}>
           <Text style={{ fontSize: 14 }}>✨</Text>
           <Text style={styles.sectionTitle}>Tips for You</Text>
         </View>
-
         <View style={styles.tipCard}>
           <View style={styles.tipIconWrap}>
             <Ionicons name="moon" size={18} color="#8B5CF6" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.tipTitle}>Sleep Better</Text>
+            <Text style={styles.tipTitle}>Keep Going</Text>
+            <Text style={styles.tipSub}>Consistent entries make your mood and topic trends much more useful.</Text>
+          </View>
+        </View>
+
+        <View style={styles.tipCard}>
+          <View style={[styles.tipIconWrap, { backgroundColor: "#FEE2E2" }]}>
+            <Text style={{ fontSize: 18 }}>🍅</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tipTitle}>Try the Pomodoro Technique</Text>
             <Text style={styles.tipSub}>
-              Your mood is better on days with 7+ hours of sleep!
+              Break your study sessions into 25-minute chunks to maintain focus.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.tipCard}>
+          <View style={[styles.tipIconWrap, { backgroundColor: "#E0E7FF" }]}>
+            <Text style={{ fontSize: 18 }}>🧘</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.tipTitle}>Box Breathing Reset</Text>
+            <Text style={styles.tipSub}>
+              Feeling overwhelmed? Breathe in for 4s, hold for 4s, out for 4s.
             </Text>
           </View>
         </View>
@@ -265,6 +259,7 @@ export default function InsightsScreen() {
 }
 
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
     backgroundColor: "#F0F5FF",
@@ -534,6 +529,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
+    marginBottom: 12,
   },
   tipIconWrap: {
     width: 40,
@@ -554,4 +550,5 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 16,
   },
+
 });

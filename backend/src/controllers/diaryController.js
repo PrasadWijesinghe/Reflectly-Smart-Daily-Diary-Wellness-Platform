@@ -10,7 +10,7 @@ function generateSummary(content) {
   }
 
   if (trimmed.length <= 120) return trimmed;
-  return trimmed.substring(0, 120) + "...";
+  return `${trimmed.substring(0, 120)}...`;
 }
 
 function normalizeDate(dateStr) {
@@ -23,8 +23,26 @@ function normalizeDate(dateStr) {
   return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 }
 
-// GET /api/diary/dates
-const getEntryDates = async (req, res) => {
+function getMoodColor(entry) {
+  const content = `${entry.content || ""} ${entry.summary || ""}`.toLowerCase();
+
+  if (content.includes("happy") || content.includes("grateful") || content.includes("great")) {
+    return "#FCD34D";
+  }
+  if (content.includes("stress") || content.includes("anxious") || content.includes("overwhelmed")) {
+    return "#F87171";
+  }
+  if (content.includes("calm") || content.includes("peaceful") || content.includes("relaxed")) {
+    return "#34D399";
+  }
+  if (content.includes("tired") || content.includes("low energy")) {
+    return "#9CA3AF";
+  }
+
+  return "#60A5FA";
+}
+
+async function getEntryDates(req, res) {
   try {
     const entries = await prisma.dailyDiary.findMany({
       where: { userId: req.user.userId },
@@ -41,10 +59,90 @@ const getEntryDates = async (req, res) => {
     console.error("GetEntryDates error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
-};
+}
 
-// GET /api/diary?date=2026-03-22
-const getEntries = async (req, res) => {
+async function getWeekMoods(req, res) {
+  try {
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() - 6);
+    start.setUTCHours(0, 0, 0, 0);
+
+    const entries = await prisma.dailyDiary.findMany({
+      where: {
+        userId: req.user.userId,
+        date: { gte: start },
+      },
+      orderBy: { date: "asc" },
+      include: { tags: true },
+    });
+
+    const weekMoods = entries.map((entry) => ({
+      date: new Date(entry.date).toISOString().split("T")[0],
+      color: getMoodColor(entry),
+      filled: true,
+    }));
+
+    res.json({ weekMoods });
+  } catch (err) {
+    console.error("GetWeekMoods error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+}
+
+async function getMoodTrend(req, res) {
+  try {
+    const requestedDays = Number.parseInt(req.query.days, 10);
+    const days = Number.isFinite(requestedDays) && requestedDays > 0
+      ? requestedDays
+      : 7;
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const start = new Date(today);
+    start.setUTCDate(today.getUTCDate() - (days - 1));
+
+    const entries = await prisma.dailyDiary.findMany({
+      where: {
+        userId: req.user.userId,
+        date: { gte: start },
+      },
+      orderBy: { date: "asc" },
+    });
+
+    const byDate = new Map(
+      entries.map((entry) => [
+        new Date(entry.date).toISOString().split("T")[0],
+        entry,
+      ])
+    );
+
+    const responseDays = [];
+
+    for (let index = 0; index < days; index += 1) {
+      const current = new Date(start);
+      current.setUTCDate(start.getUTCDate() + index);
+      const key = current.toISOString().split("T")[0];
+      const entry = byDate.get(key);
+
+      responseDays.push({
+        date: key,
+        day: current.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }),
+        filled: Boolean(entry),
+        mood: entry ? "logged" : null,
+        emoji: entry ? "😊" : null,
+        color: entry ? getMoodColor(entry) : "rgba(255,255,255,0.2)",
+      });
+    }
+
+    res.json({ days: responseDays });
+  } catch (err) {
+    console.error("GetMoodTrend error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+}
+
+async function getEntries(req, res) {
   try {
     const { date } = req.query;
 
@@ -75,10 +173,9 @@ const getEntries = async (req, res) => {
     console.error("GetEntries error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
-};
+}
 
-// POST /api/diary
-const createEntry = async (req, res) => {
+async function createEntry(req, res) {
   try {
     const { content, date, tagIds } = req.body;
 
@@ -127,13 +224,12 @@ const createEntry = async (req, res) => {
     console.error("CreateEntry error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
-};
+}
 
-// GET /api/diary/:id
-const getEntry = async (req, res) => {
+async function getEntry(req, res) {
   try {
     const entry = await prisma.dailyDiary.findFirst({
-      where: { id: parseInt(req.params.id), userId: req.user.userId },
+      where: { id: parseInt(req.params.id, 10), userId: req.user.userId },
       include: { tags: true },
     });
 
@@ -146,15 +242,14 @@ const getEntry = async (req, res) => {
     console.error("GetEntry error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
-};
+}
 
-// PUT /api/diary/:id
-const updateEntry = async (req, res) => {
+async function updateEntry(req, res) {
   try {
     const { content, tagIds } = req.body;
 
     const existing = await prisma.dailyDiary.findFirst({
-      where: { id: parseInt(req.params.id), userId: req.user.userId },
+      where: { id: parseInt(req.params.id, 10), userId: req.user.userId },
     });
 
     if (!existing) {
@@ -183,13 +278,12 @@ const updateEntry = async (req, res) => {
     console.error("UpdateEntry error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
-};
+}
 
-// DELETE /api/diary/:id
-const deleteEntry = async (req, res) => {
+async function deleteEntry(req, res) {
   try {
     const existing = await prisma.dailyDiary.findFirst({
-      where: { id: parseInt(req.params.id), userId: req.user.userId },
+      where: { id: parseInt(req.params.id, 10), userId: req.user.userId },
     });
 
     if (!existing) {
@@ -203,13 +297,15 @@ const deleteEntry = async (req, res) => {
     console.error("DeleteEntry error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
-};
+}
 
 module.exports = {
   createEntry,
+  deleteEntry,
   getEntries,
   getEntry,
   getEntryDates,
+  getMoodTrend,
+  getWeekMoods,
   updateEntry,
-  deleteEntry,
 };
