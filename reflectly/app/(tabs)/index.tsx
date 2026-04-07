@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import { getApiUrl } from "../../utils/api";
+import NotificationService from "../../utils/NotificationService";
 
 type MoodTrendDay = {
   date: string;
@@ -59,6 +60,9 @@ export default function HomeScreen() {
     }
 
     loadWeekMoods();
+
+    // යූසර් ඇප් එක Open කරපු ගමන්, අර දවස් 3ක ඔරලෝසුව Reset කරනවා!
+    NotificationService.scheduleInactivityAlert();
   }, [token]);
 
   const vibeLabel = weekMoods.some((day) => day.filled) ? "Live" : "No data";

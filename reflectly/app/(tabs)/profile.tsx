@@ -259,7 +259,12 @@ export default function ProfileScreen() {
         // Turn on
         const token = await NotificationService.registerForPushNotificationsAsync();
         if (token) {
+          // රෑ 8.00 Reminder එක
           await NotificationService.scheduleDailyReminder();
+
+          // අලුතින් දැම්ම උදේ 8.00 Motivation එක 
+          await NotificationService.scheduleMorningMotivation();
+
           setIsRemindersEnabled(true);
           await AsyncStorage.setItem("daily_reminders_enabled", JSON.stringify(true));
           // Note: In the next step, we will send this token to the backend

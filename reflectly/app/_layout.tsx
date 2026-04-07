@@ -3,6 +3,7 @@ import { AppState, AppStateStatus } from "react-native";
 import { Stack } from "expo-router";
 import { AuthProvider } from "../context/AuthContext";
 import SecurityService from "../utils/SecurityService";
+import NotificationService from "../utils/NotificationService";
 import LockScreen from "../components/Security/LockScreen";
 import "./global.css";
 
@@ -12,6 +13,9 @@ export default function RootLayout() {
   useEffect(() => {
     // 1. Initial check on mount
     checkLockStatus();
+
+    // Reset inactivity alert on startup
+    NotificationService.scheduleInactivityAlert();
 
     // 2. Listen for AppState changes (Background -> Foreground)
     const subscription = AppState.addEventListener("change", handleAppStateChange);
@@ -34,6 +38,9 @@ export default function RootLayout() {
       if (isEnabled) {
         setIsAppLocked(true);
       }
+
+      // Reset inactivity alert when user returns to app
+      NotificationService.scheduleInactivityAlert();
     }
   };
 

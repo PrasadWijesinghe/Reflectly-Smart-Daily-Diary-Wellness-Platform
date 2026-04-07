@@ -2,6 +2,7 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Configure how notifications are handled when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -102,6 +103,58 @@ class NotificationService {
   async getNotificationStatus() {
     const { status } = await Notifications.getPermissionsAsync();
     return status === "granted";
+  }
+
+  // ==========================================
+  // 1. Morning Motivation Quotes (උදේ 8.00 ට)
+  // ==========================================
+  async scheduleMorningMotivation() {
+    // ලස්සන Quotes ටිකක්
+    const quotes = [
+      "Today is a fresh start! Make it count. 🌅",
+      "Take a deep breath. You've got this! 💪",
+      "Small steps every day lead to big changes. ✨",
+      "Be kind to your mind today. 🧠",
+      "Your wellness matters. Take time for yourself today. 🧘‍♀️"
+    ];
+    // Random එකක් තෝරගන්නවා
+    const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Good Morning! ☀️",
+        body: randomQuote,
+        data: { screen: "home" },
+        sound: true,
+      },
+      trigger: { hour: 8, minute: 0, repeats: true } as Notifications.NotificationTriggerInput,
+    });
+  }
+
+  // ==========================================
+  // 2. Inactivity Alert (දවස් 3ක් ඇප් එකට ආවේ නැත්නම්)
+  // ==========================================
+  async scheduleInactivityAlert() {
+    // 1. කලින් දාපු Inactivity Alert එකක් තියෙනවා නම් ඒක අයින් කරනවා
+    const oldId = await AsyncStorage.getItem("inactivity_notification_id");
+    if (oldId) {
+      await Notifications.cancelScheduledNotificationAsync(oldId);
+    }
+
+    // 2. අලුත් එකක් හරියටම දවස් 3කින් (තත්පර වලින්) Schedule කරනවා
+    const newId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "We miss you! 👋",
+        body: "It's been a few days since your last entry. Take a moment to reflect on your day.",
+        data: { screen: "diary" },
+        sound: true,
+      },
+      // දවස් 3 = පැය 72 = මිනිත්තු 4320 = තත්පර 259200
+      trigger: { seconds: 3 * 24 * 60 * 60 } as Notifications.NotificationTriggerInput, 
+    });
+
+    // 3. අලුත් ID එක Save කරගන්නවා ඊළඟ පාර Cancel කරන්න
+    await AsyncStorage.setItem("inactivity_notification_id", newId);
   }
 }
 
