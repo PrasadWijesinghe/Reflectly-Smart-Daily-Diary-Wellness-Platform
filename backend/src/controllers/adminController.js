@@ -80,7 +80,53 @@ async function getUsers(req, res) {
   }
 }
 
+async function getTags(req, res) {
+  try {
+    const tags = await prisma.tag.findMany({
+      select: {
+        id: true,
+        name: true,
+        icon: true,
+        color: true,
+        _count: {
+          select: {
+            diaries: true,
+          },
+        },
+      },
+    });
+
+    return res.json({
+      tags: tags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        icon: tag.icon,
+        color: tag.color,
+        usageCount: tag._count.diaries,
+      })),
+    });
+  } catch (err) {
+    console.error("Get admin tags error:", err);
+    return res.status(500).json({ error: "Failed to fetch tags." });
+  }
+}
+
+async function getFeedbacks(req, res) {
+  try {
+    const feedbacks = await prisma.feedback.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.json({ feedbacks });
+  } catch (err) {
+    console.error("Get admin feedbacks error:", err);
+    return res.status(500).json({ error: "Failed to fetch feedbacks." });
+  }
+}
+
 module.exports = {
   login,
   getUsers,
+  getTags,
+  getFeedbacks,
 };

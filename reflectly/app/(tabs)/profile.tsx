@@ -124,8 +124,16 @@ function calculateThisWeek(entries: DiaryEntry[]) {
 }
 
 function SettingItem({ item }: { item: SettingRow }) {
+  const router = useRouter();
+
+  const handlePress = () => {
+    if (item.label === "Send Feedback") {
+      router.push("/feedback");
+    }
+  };
+
   return (
-    <TouchableOpacity style={styles.settingRow} activeOpacity={0.6}>
+    <TouchableOpacity style={styles.settingRow} activeOpacity={0.6} onPress={handlePress}>
       <View style={styles.settingLeft}>
         <View
           style={[styles.settingIconWrap, { backgroundColor: item.iconColor + "18" }]}
@@ -331,25 +339,6 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <View style={styles.aboutCard}>
-          <View style={styles.aboutHeader}>
-            <Text style={styles.aboutEmoji}>💡</Text>
-            <Text style={styles.aboutTitle}>About This App</Text>
-          </View>
-          <Text style={styles.aboutText}>
-            Student Life Diary helps you reflect on daily experiences and track
-            your wellbeing in a friendly way.
-          </Text>
-          <View style={styles.aboutNote}>
-            <Text style={styles.aboutNoteText}>
-              <Text style={styles.aboutNoteLead}>Note: </Text>
-              This app provides general wellness insights and is not a substitute
-              for professional advice. If you need support, please reach out to a
-              qualified healthcare provider. 💙
-            </Text>
-          </View>
-        </View>
-
         <TouchableOpacity
           style={styles.logoutBtn}
           onPress={handleLogout}
@@ -358,11 +347,6 @@ export default function ProfileScreen() {
           <Ionicons name="log-out-outline" size={20} color="#EF4444" />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerVersion}>Student Life Diary v1.0.0</Text>
-          <Text style={styles.footerMade}>Made with care for students</Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -549,51 +533,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     marginLeft: 60,
   },
-  aboutCard: {
-    backgroundColor: "#FFFBEB",
-    borderRadius: 16,
-    padding: 18,
-    marginTop: 22,
-  },
-  aboutHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  aboutEmoji: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  aboutTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1F2937",
-  },
-  aboutText: {
-    fontSize: 13,
-    color: "#6B7280",
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  aboutNote: {
-    backgroundColor: "#FFF7ED",
-    borderRadius: 10,
-    padding: 12,
-  },
-  aboutNoteText: {
-    fontSize: 12,
-    color: "#EF4444",
-    lineHeight: 18,
-  },
-  aboutNoteLead: {
-    fontWeight: "700",
-    color: "#1F2937",
-  },
-  footer: {
-    alignItems: "center",
-    marginTop: 24,
-    paddingBottom: 10,
-  },
   logoutBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -611,15 +550,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#EF4444",
-  },
-  footerVersion: {
-    fontSize: 12,
-    color: "#3B82F6",
-    fontWeight: "500",
-  },
-  footerMade: {
-    fontSize: 11,
-    color: "#9CA3AF",
-    marginTop: 4,
   },
 });
