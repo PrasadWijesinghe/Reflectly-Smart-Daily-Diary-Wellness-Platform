@@ -34,6 +34,12 @@ export const getApiUrl = (): string => {
     return normalizeApiUrl(envApiUrl);
   }
 
+  // Web dev runs on the same machine as backend in this project setup.
+  // Prefer localhost to avoid stale LAN IPs from Expo hostUri causing timeouts.
+  if (Platform.OS === "web") {
+    return DEFAULT_API_URL;
+  }
+
   const host = getExpoHost();
   if (host) {
     if (isExpoTunnelHost(host)) {
