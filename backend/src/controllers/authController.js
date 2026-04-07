@@ -390,6 +390,26 @@ const getMe = async (req, res) => {
   }
 };
 
+// POST /api/auth/push-token
+const updatePushToken = async (req, res) => {
+  try {
+    const { pushToken } = req.body;
+    if (!pushToken) {
+      return res.status(400).json({ error: "Push token is required." });
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { pushToken },
+    });
+
+    res.json({ message: "Push token updated successfully." });
+  } catch (err) {
+    console.error("UpdatePushToken error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -398,4 +418,5 @@ module.exports = {
   sendForgotPasswordOtp,
   verifyForgotPasswordOtp,
   resetPasswordWithOtp,
+  updatePushToken,
 };

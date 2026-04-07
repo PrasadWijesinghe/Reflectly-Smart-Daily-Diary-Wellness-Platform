@@ -211,8 +211,19 @@ async function createEntry(req, res) {
         userId: req.user.userId,
         ...(tagConnect && { tags: tagConnect }),
       },
-      include: { tags: true },
+      include: { tags: true, user: true },
     });
+
+    // Smart Nudge logic (Stress detection)
+    if (getMoodColor(entry) === "#F87171" && entry.user.pushToken) {
+      const { sendPushNotification } = require("../services/notificationService");
+      sendPushNotification(
+        entry.user.pushToken,
+        "Deep Breath Needed? 🌿",
+        "It sounds like you're having a stressful time. Remember to be kind to yourself today.",
+        { screen: "insights" }
+      ).catch(err => console.error("Smart Nudge failed:", err));
+    }
 
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {

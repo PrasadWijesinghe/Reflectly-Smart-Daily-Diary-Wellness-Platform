@@ -7,6 +7,7 @@ const {
 	sendForgotPasswordOtp,
 	verifyForgotPasswordOtp,
 	resetPasswordWithOtp,
+	updatePushToken,
 } = require("../controllers/authController");
 const authenticate = require("../middleware/auth");
 
@@ -19,5 +20,6 @@ router.post("/forgot-password/verify-otp", verifyForgotPasswordOtp);
 router.post("/forgot-password/reset", resetPasswordWithOtp);
 router.post("/login", login);
 router.get("/me", authenticate, getMe);
+router.post("/push-token", authenticate, updatePushToken);
 
 module.exports = router;
