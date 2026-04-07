@@ -14,6 +14,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import { getApiUrl } from "../../utils/api";
+import NotificationService from "../../utils/NotificationService";
+import SecurityService from "../../utils/SecurityService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Modal, TextInput, Alert } from "react-native";
 
 type SettingRow = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -159,6 +163,115 @@ export default function ProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRemindersEnabled, setIsRemindersEnabled] = useState(false);
+  const [isAppLockEnabled, setIsAppLockEnabled] = useState(false);
+  
+  // PIN Setup State
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const [pinStep, setPinStep] = useState<"enter" | "confirm">("enter");
+  const [tempPin, setTempPin] = useState("");
+  const [pinInput, setPinInput] = useState("");
+
+  // Load preferences on mount
+  useEffect(() => {
+    (async () => {
+      // Load Reminders
+      const storedReminders = await AsyncStorage.getItem("daily_reminders_enabled");
+      if (storedReminders !== null) {
+        setIsRemindersEnabled(JSON.parse(storedReminders));
+      }
+
+      // Load App Lock
+      const lockEnabled = await SecurityService.isLockEnabled();
+      setIsAppLockEnabled(lockEnabled);
+    })();
+  }, []);
+
+  async function handleToggleAppLock() {
+    if (isAppLockEnabled) {
+      // Authenticate before turning off for security
+      const result = await SecurityService.authenticate();
+      if (result.success) {
+        await SecurityService.setLockEnabled(false);
+        setIsAppLockEnabled(false);
+      }
+    } else {
+      // Turning ON - Need to setup PIN first
+      setPinInput("");
+      setTempPin("");
+      setPinStep("enter");
+      setShowPinSetup(true);
+    }
+  }
+
+  async function handlePinSubmit() {
+    if (pinInput.length !== 4) {
+      Alert.alert("Error", "PIN must be 4 digits.");
+      return;
+    }
+
+    if (pinStep === "enter") {
+      setTempPin(pinInput);
+      setPinInput("");
+      setPinStep("confirm");
+    } else {
+      if (pinInput === tempPin) {
+        // Success
+        try {
+          await SecurityService.savePIN(pinInput);
+          await SecurityService.setLockEnabled(true);
+          setIsAppLockEnabled(true);
+          setShowPinSetup(false);
+          Alert.alert("Success", "App Lock has been enabled.");
+        } catch (err) {
+          Alert.alert("Error", "Failed to save PIN.");
+        }
+      } else {
+        Alert.alert("Error", "PINs do not match. Try again.");
+        setPinInput("");
+        setPinStep("enter");
+      }
+    }
+  }
+
+  // Load reminder preference on mount
+  useEffect(() => {
+    (async () => {
+      const storedPref = await AsyncStorage.getItem("daily_reminders_enabled");
+      if (storedPref !== null) {
+        setIsRemindersEnabled(JSON.parse(storedPref));
+      } else {
+        // Default to checking system status if no preference stored
+        const status = await NotificationService.getNotificationStatus();
+        setIsRemindersEnabled(status);
+      }
+    })();
+  }, []);
+
+  async function handleToggleReminders() {
+    try {
+      if (isRemindersEnabled) {
+        // Turn off
+        await NotificationService.cancelDailyReminders();
+        setIsRemindersEnabled(false);
+        await AsyncStorage.setItem("daily_reminders_enabled", JSON.stringify(false));
+      } else {
+        // Turn on
+        const token = await NotificationService.registerForPushNotificationsAsync();
+        if (token) {
+          await NotificationService.scheduleDailyReminder();
+          setIsRemindersEnabled(true);
+          await AsyncStorage.setItem("daily_reminders_enabled", JSON.stringify(true));
+          // Note: In the next step, we will send this token to the backend
+        } else {
+          alert("Please enable notification permissions in your device settings to use reminders.");
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle reminders:", err);
+      setError("Failed to update reminder settings.");
+    }
+  }
 
   async function loadProfileData(showRefresh = false) {
     if (!token) {
@@ -303,22 +416,68 @@ export default function ProfileScreen() {
 
         <Text style={styles.sectionLabel}>DIARY PREFERENCES</Text>
         <View style={styles.sectionCard}>
-          {DIARY_PREFS.map((item, i) => (
-            <View key={i}>
-              <SettingItem item={item} />
-              {i < DIARY_PREFS.length - 1 && <View style={styles.divider} />}
+          <SettingItem item={DIARY_PREFS[0]} />
+          <View style={styles.divider} />
+          
+          <TouchableOpacity 
+            style={styles.settingRow} 
+            activeOpacity={0.6}
+            onPress={handleToggleReminders}
+          >
+            <View style={styles.settingLeft}>
+              <View
+                style={[styles.settingIconWrap, { backgroundColor: DIARY_PREFS[1].iconColor + "18" }]}
+              >
+                <Ionicons name={DIARY_PREFS[1].icon} size={18} color={DIARY_PREFS[1].iconColor} />
+              </View>
+              <Text style={styles.settingLabel}>{DIARY_PREFS[1].label}</Text>
             </View>
-          ))}
+            <View style={styles.settingRight}>
+              <Text
+                style={[
+                  styles.settingValue,
+                  { color: isRemindersEnabled ? "#10B981" : "#EF4444" },
+                ]}
+              >
+                {isRemindersEnabled ? "On" : "Off"}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+            </View>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.sectionLabel}>PRIVACY & SECURITY</Text>
         <View style={styles.sectionCard}>
-          {PRIVACY.map((item, i) => (
-            <View key={i}>
-              <SettingItem item={item} />
-              {i < PRIVACY.length - 1 && <View style={styles.divider} />}
+          <TouchableOpacity 
+            style={styles.settingRow} 
+            activeOpacity={0.6}
+            onPress={handleToggleAppLock}
+          >
+            <View style={styles.settingLeft}>
+              <View
+                style={[styles.settingIconWrap, { backgroundColor: PRIVACY[0].iconColor + "18" }]}
+              >
+                <Ionicons name="finger-print" size={18} color={PRIVACY[0].iconColor} />
+              </View>
+              <Text style={styles.settingLabel}>Biometric App Lock</Text>
             </View>
-          ))}
+            <View style={styles.settingRight}>
+              <Text
+                style={[
+                  styles.settingValue,
+                  { color: isAppLockEnabled ? "#10B981" : "#EF4444" },
+                ]}
+              >
+                {isAppLockEnabled ? "On" : "Off"}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+            </View>
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          
+          <SettingItem item={PRIVACY[0]} />
+          <View style={styles.divider} />
+          <SettingItem item={PRIVACY[1]} />
         </View>
 
         <Text style={styles.sectionLabel}>SUPPORT</Text>
@@ -364,6 +523,58 @@ export default function ProfileScreen() {
           <Text style={styles.footerMade}>Made with care for students</Text>
         </View>
       </ScrollView>
+
+      {/* PIN Setup Modal */}
+      <Modal
+        visible={showPinSetup}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="lock-closed" size={32} color="#3B82F6" />
+              <Text style={styles.modalTitle}>
+                {pinStep === "enter" ? "Set 4-Digit PIN" : "Confirm PIN"}
+              </Text>
+              <Text style={styles.modalSubtitle}>
+                {pinStep === "enter" 
+                  ? "Enter a secure PIN for app access" 
+                  : "Enter the PIN once more to confirm"}
+              </Text>
+            </View>
+
+            <TextInput
+              style={styles.pinInput}
+              value={pinInput}
+              onChangeText={(text) => setPinInput(text.replace(/[^0-9]/g, "").slice(0, 4))}
+              keyboardType="number-pad"
+              secureTextEntry
+              autoFocus
+              maxLength={4}
+              placeholder="0 0 0 0"
+              placeholderTextColor="#D1D5DB"
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.cancelBtn]} 
+                onPress={() => setShowPinSetup(false)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.confirmBtn]} 
+                onPress={handlePinSubmit}
+              >
+                <Text style={styles.confirmBtnText}>
+                  {pinStep === "enter" ? "Next" : "Enable Lock"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -621,5 +832,75 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#9CA3AF",
     marginTop: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 340,
+    alignItems: "center",
+  },
+  modalHeader: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1F2937",
+    marginTop: 12,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+    textAlign: "center",
+    marginTop: 4,
+  },
+  pinInput: {
+    width: "100%",
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 24,
+    textAlign: "center",
+    letterSpacing: 10,
+    color: "#1F2937",
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelBtn: {
+    backgroundColor: "#F3F4F6",
+  },
+  confirmBtn: {
+    backgroundColor: "#3B82F6",
+  },
+  cancelBtnText: {
+    color: "#6B7280",
+    fontWeight: "700",
+  },
+  confirmBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
   },
 });
