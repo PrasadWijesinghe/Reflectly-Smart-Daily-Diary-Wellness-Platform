@@ -79,9 +79,9 @@ class NotificationService {
         sound: true,
       },
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: 20, // 8:00 PM
         minute: 0,
-        repeats: true,
       } as Notifications.NotificationTriggerInput,
     });
 
@@ -109,6 +109,9 @@ class NotificationService {
   // 1. Morning Motivation Quotes (උදේ 8.00 ට)
   // ==========================================
   async scheduleMorningMotivation() {
+    // Web එකක් නම් මෙතනින් නවත්වන්න
+    if (Platform.OS === "web") return;
+
     // ලස්සන Quotes ටිකක්
     const quotes = [
       "Today is a fresh start! Make it count. 🌅",
@@ -127,7 +130,7 @@ class NotificationService {
         data: { screen: "home" },
         sound: true,
       },
-      trigger: { hour: 8, minute: 0, repeats: true } as Notifications.NotificationTriggerInput,
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: 8, minute: 0 } as Notifications.NotificationTriggerInput,
     });
   }
 
@@ -135,6 +138,9 @@ class NotificationService {
   // 2. Inactivity Alert (දවස් 3ක් ඇප් එකට ආවේ නැත්නම්)
   // ==========================================
   async scheduleInactivityAlert() {
+    // Web එකක් නම් මෙතනින් නවත්වන්න
+    if (Platform.OS === "web") return;
+
     // 1. කලින් දාපු Inactivity Alert එකක් තියෙනවා නම් ඒක අයින් කරනවා
     const oldId = await AsyncStorage.getItem("inactivity_notification_id");
     if (oldId) {
@@ -150,7 +156,11 @@ class NotificationService {
         sound: true,
       },
       // දවස් 3 = පැය 72 = මිනිත්තු 4320 = තත්පර 259200
-      trigger: { seconds: 3 * 24 * 60 * 60 } as Notifications.NotificationTriggerInput, 
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 3 * 24 * 60 * 60,
+        repeats: false,
+      } as Notifications.NotificationTriggerInput,
     });
 
     // 3. අලුත් ID එක Save කරගන්නවා ඊළඟ පාර Cancel කරන්න
