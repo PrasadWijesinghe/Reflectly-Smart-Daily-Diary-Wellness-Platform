@@ -1,16 +1,19 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Text,
-  View,
+  ActivityIndicator,
+  RefreshControl,
   ScrollView,
-  TouchableOpacity,
   StatusBar,
   StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { getApiUrl } from "../../utils/api";
 
 type SettingRow = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -18,6 +21,18 @@ type SettingRow = {
   label: string;
   value?: string;
   valueColor?: string;
+};
+
+type ProfileUser = {
+  id: number;
+  name: string;
+  email: string;
+  createdAt: string;
+};
+
+type DiaryEntry = {
+  id: number;
+  date: string;
 };
 
 const DIARY_PREFS: SettingRow[] = [
@@ -67,15 +82,58 @@ const SUPPORT: SettingRow[] = [
   },
 ];
 
-const STATS = [
-  { value: "47", label: "Entries", emoji: "📝" },
-  { value: "12", label: "Streak", emoji: "🔥" },
-  { value: "8", label: "This Week", emoji: "🌟" },
-];
+function formatMemberSince(createdAt?: string) {
+  if (!createdAt) return "Member since recently";
+  return `Member since ${new Date(createdAt).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+  })}`;
+}
+
+function getInitials(name?: string) {
+  if (!name) return "U";
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((part) => part[0]?.toUpperCase() || "").join("") || "U";
+}
+
+function calculateStreak(entries: DiaryEntry[]) {
+  const days = new Set(
+    entries.map((entry) => new Date(entry.date).toISOString().split("T")[0])
+  );
+
+  let streak = 0;
+  const current = new Date();
+  current.setHours(0, 0, 0, 0);
+
+  while (days.has(current.toISOString().split("T")[0])) {
+    streak += 1;
+    current.setDate(current.getDate() - 1);
+  }
+
+  return streak;
+}
+
+function calculateThisWeek(entries: DiaryEntry[]) {
+  const now = new Date();
+  const currentDay = now.getDay();
+  const weekStart = new Date(now);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(now.getDate() - currentDay);
+
+  return entries.filter((entry) => new Date(entry.date) >= weekStart).length;
+}
 
 function SettingItem({ item }: { item: SettingRow }) {
+  const router = useRouter();
+
+  const handlePress = () => {
+    if (item.label === "Send Feedback") {
+      router.push("/feedback");
+    }
+  };
+
   return (
-    <TouchableOpacity style={styles.settingRow} activeOpacity={0.6}>
+    <TouchableOpacity style={styles.settingRow} activeOpacity={0.6} onPress={handlePress}>
       <View style={styles.settingLeft}>
         <View
           style={[styles.settingIconWrap, { backgroundColor: item.iconColor + "18" }]}
@@ -103,17 +161,85 @@ function SettingItem({ item }: { item: SettingRow }) {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, token, user } = useAuth();
+  const [profile, setProfile] = useState<ProfileUser | null>(null);
+  const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadProfileData(showRefresh = false) {
+    if (!token) {
+      setProfile(null);
+      setEntries([]);
+      setIsLoading(false);
+      return;
+    }
+
+    if (showRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+
+    try {
+      setError(null);
+
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [meRes, diaryRes] = await Promise.all([
+        fetch(`${getApiUrl()}/auth/me`, { headers }),
+        fetch(`${getApiUrl()}/diary`, { headers }),
+      ]);
+
+      const meData = await meRes.json();
+      const diaryData = await diaryRes.json();
+
+      if (!meRes.ok) {
+        throw new Error(meData.error || "Failed to load profile.");
+      }
+
+      if (!diaryRes.ok) {
+        throw new Error(diaryData.error || "Failed to load diary stats.");
+      }
+
+      setProfile(meData.user);
+      setEntries(Array.isArray(diaryData.entries) ? diaryData.entries : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load profile.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    loadProfileData();
+  }, [token]);
 
   async function handleLogout() {
     await logout();
     router.replace("/(auth)/login");
   }
+
+  const stats = useMemo(
+    () => [
+      { value: String(entries.length), label: "Entries", emoji: "📝" },
+      { value: String(calculateStreak(entries)), label: "Streak", emoji: "🔥" },
+      { value: String(calculateThisWeek(entries)), label: "This Week", emoji: "🌟" },
+    ],
+    [entries]
+  );
+
+  const displayName = profile?.name || user?.name || "User";
+  const displayEmail = profile?.email || user?.email || "No email";
+  const displayCreatedAt = profile?.createdAt;
+  const initials = getInitials(displayName);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      {/* Header */}
       <LinearGradient
         colors={["#3B82F6", "#2563EB", "#1D4ED8"]}
         style={styles.header}
@@ -125,9 +251,7 @@ export default function ProfileScreen() {
             </View>
             <View>
               <Text style={styles.headerTitle}>Profile</Text>
-              <Text style={styles.headerSubtitle}>
-                Your account & settings ⚙️
-              </Text>
+              <Text style={styles.headerSubtitle}>Your account and settings</Text>
             </View>
           </View>
         </View>
@@ -137,8 +261,14 @@ export default function ProfileScreen() {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => loadProfileData(true)}
+            tintColor="#3B82F6"
+          />
+        }
       >
-        {/* Profile Card */}
         <LinearGradient
           colors={["#3B82F6", "#6366F1", "#7C3AED"]}
           start={{ x: 0, y: 0 }}
@@ -147,29 +277,38 @@ export default function ProfileScreen() {
         >
           <View style={styles.profileTop}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>AJ</Text>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.profileName}>Alex Johnson</Text>
-              <Text style={styles.profileEmail}>alex.johnson@university.edu</Text>
-              <Text style={styles.profileSince}>Member since January 2025 📅</Text>
+              <Text style={styles.profileName}>{displayName}</Text>
+              <Text style={styles.profileEmail}>{displayEmail}</Text>
+              <Text style={styles.profileSince}>{formatMemberSince(displayCreatedAt)}</Text>
             </View>
           </View>
 
-          {/* Stats Row */}
-          <View style={styles.statsRow}>
-            {STATS.map((stat, index) => (
-              <View key={index} style={styles.statItem}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>
-                  {stat.label} {stat.emoji}
-                </Text>
-              </View>
-            ))}
-          </View>
+          {isLoading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color="#FFFFFF" />
+              <Text style={styles.loadingText}>Loading profile...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorWrap}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : (
+            <View style={styles.statsRow}>
+              {stats.map((stat) => (
+                <View key={stat.label} style={styles.statItem}>
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>
+                    {stat.label} {stat.emoji}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </LinearGradient>
 
-        {/* Diary Preferences */}
         <Text style={styles.sectionLabel}>DIARY PREFERENCES</Text>
         <View style={styles.sectionCard}>
           {DIARY_PREFS.map((item, i) => (
@@ -180,7 +319,6 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* Privacy & Security */}
         <Text style={styles.sectionLabel}>PRIVACY & SECURITY</Text>
         <View style={styles.sectionCard}>
           {PRIVACY.map((item, i) => (
@@ -191,7 +329,6 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* Support */}
         <Text style={styles.sectionLabel}>SUPPORT</Text>
         <View style={styles.sectionCard}>
           {SUPPORT.map((item, i) => (
@@ -202,27 +339,6 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* About This App */}
-        <View style={styles.aboutCard}>
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-            <Text style={{ fontSize: 16, marginRight: 8 }}>💡</Text>
-            <Text style={styles.aboutTitle}>About This App</Text>
-          </View>
-          <Text style={styles.aboutText}>
-            Student Life Diary helps you reflect on daily experiences and track
-            your wellbeing in a fun, friendly way!
-          </Text>
-          <View style={styles.aboutNote}>
-            <Text style={styles.aboutNoteText}>
-              <Text style={{ fontWeight: "700", color: "#1F2937" }}>Note: </Text>
-              This app provides general wellness insights and is not a substitute
-              for professional advice. If you need support, please reach out to a
-              qualified healthcare provider. 💙
-            </Text>
-          </View>
-        </View>
-
-        {/* Logout Button */}
         <TouchableOpacity
           style={styles.logoutBtn}
           onPress={handleLogout}
@@ -231,12 +347,6 @@ export default function ProfileScreen() {
           <Ionicons name="log-out-outline" size={20} color="#EF4444" />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerVersion}>Student Life Diary v1.0.0</Text>
-          <Text style={styles.footerMade}>Made with 💙 for students</Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -323,6 +433,26 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.6)",
     marginTop: 3,
   },
+  loadingWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+  },
+  loadingText: {
+    color: "#FFFFFF",
+    marginTop: 8,
+    fontSize: 13,
+  },
+  errorWrap: {
+    backgroundColor: "rgba(239,68,68,0.18)",
+    borderRadius: 12,
+    padding: 12,
+  },
+  errorText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    lineHeight: 18,
+  },
   statsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -403,38 +533,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     marginLeft: 60,
   },
-  aboutCard: {
-    backgroundColor: "#FFFBEB",
-    borderRadius: 16,
-    padding: 18,
-    marginTop: 22,
-  },
-  aboutTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1F2937",
-  },
-  aboutText: {
-    fontSize: 13,
-    color: "#6B7280",
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  aboutNote: {
-    backgroundColor: "#FFF7ED",
-    borderRadius: 10,
-    padding: 12,
-  },
-  aboutNoteText: {
-    fontSize: 12,
-    color: "#EF4444",
-    lineHeight: 18,
-  },
-  footer: {
-    alignItems: "center",
-    marginTop: 24,
-    paddingBottom: 10,
-  },
   logoutBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -452,15 +550,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#EF4444",
-  },
-  footerVersion: {
-    fontSize: 12,
-    color: "#3B82F6",
-    fontWeight: "500",
-  },
-  footerMade: {
-    fontSize: 11,
-    color: "#9CA3AF",
-    marginTop: 4,
   },
 });

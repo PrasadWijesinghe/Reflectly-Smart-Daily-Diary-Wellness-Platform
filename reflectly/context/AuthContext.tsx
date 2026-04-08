@@ -1,20 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
-
-const getApiUrl = () => {
-  // In development, Expo exposes the dev server's host (e.g. "192.168.1.5:8081")
-  // We extract just the IP so the app always uses the correct machine address
-  const hostUri = Constants.expoConfig?.hostUri; // e.g. "192.168.1.5:8081"
-  if (hostUri) {
-    const host = hostUri.split(":")[0]; // extract just the IP
-    return `http://${host}:5000/api`;
-  }
-  // Fallback for production or when hostUri is unavailable
-  return "http://localhost:5000/api";
-};
-
-const API_URL = getApiUrl();
+import { fetchWithTimeout, getApiUrl } from "../utils/api";
 
 type User = {
   id: number;
@@ -27,7 +13,8 @@ type AuthContextType = {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  sendRegistrationOtp: (email: string) => Promise<void>;
+  register: (name: string, email: string, password: string, otp: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -62,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function login(email: string, password: string) {
-    const res = await fetch(`${API_URL}/auth/login`, {
+    const res = await fetchWithTimeout(`${getApiUrl()}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -80,11 +67,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   }
 
-  async function register(name: string, email: string, password: string) {
-    const res = await fetch(`${API_URL}/auth/register`, {
+  async function sendRegistrationOtp(email: string) {
+    const res = await fetchWithTimeout(`${getApiUrl()}/auth/send-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ email }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to send OTP");
+    }
+  }
+
+  async function register(name: string, email: string, password: string, otp: string) {
+    const res = await fetchWithTimeout(`${getApiUrl()}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, otp }),
     });
 
     const data = await res.json();
@@ -107,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, sendRegistrationOtp, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

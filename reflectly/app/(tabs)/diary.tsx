@@ -10,21 +10,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import Constants from "expo-constants";
+import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { getApiUrl } from "../../utils/api";
 import DiaryEditor from "../../components/DiaryEditor";
 import DiaryCard from "../../components/DiaryCard";
 import MonthCalendar from "../../components/MonthCalendar";
-
-const getApiUrl = () => {
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (hostUri) {
-    const host = hostUri.split(":")[0];
-    return `http://${host}:5000/api`;
-  }
-  return "http://localhost:5000/api";
-};
-const API_URL = getApiUrl();
 
 type Tag = {
   id: number;
@@ -66,6 +57,7 @@ function formatDate(isoDate: string): string {
 
 export default function DiaryScreen() {
   const { token } = useAuth();
+  const router = useRouter();
   const today = toDateString(new Date());
 
   const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
@@ -99,7 +91,7 @@ export default function DiaryScreen() {
 
   const fetchTags = async () => {
     try {
-      const res = await fetch(`${API_URL}/tags`, {
+      const res = await fetch(`${getApiUrl()}/tags`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
@@ -112,7 +104,7 @@ export default function DiaryScreen() {
 
   const fetchEntryDates = async () => {
     try {
-      const res = await fetch(`${API_URL}/diary/dates`, {
+      const res = await fetch(`${getApiUrl()}/diary/dates`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
@@ -130,7 +122,7 @@ export default function DiaryScreen() {
   const fetchEntryForDate = async (dateStr: string) => {
     try {
       setLoadingEntry(true);
-      const res = await fetch(`${API_URL}/diary?date=${dateStr}`, {
+      const res = await fetch(`${getApiUrl()}/diary?date=${dateStr}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
@@ -147,7 +139,7 @@ export default function DiaryScreen() {
   const fetchPastEntries = async () => {
     try {
       setLoadingPast(true);
-      const res = await fetch(`${API_URL}/diary`, {
+      const res = await fetch(`${getApiUrl()}/diary`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
@@ -303,9 +295,9 @@ export default function DiaryScreen() {
             <Text style={{ fontSize: 14, marginRight: 6 }}>🕐</Text>
             <Text style={styles.pastTitle}>Past Entries</Text>
           </View>
-          <TouchableOpacity>
-            <Text style={styles.viewAllText}>View All</Text>
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/viewall-diary")}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
         </View>
 
         {loadingPast ? (

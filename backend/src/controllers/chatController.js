@@ -13,6 +13,14 @@ function normalizeGeminiModelName(modelName) {
     return "gemini-2.5-flash";
   }
 
+  if (normalized === "gemini-2.5-flash-latest") {
+    return "gemini-2.5-flash";
+  }
+
+  if (normalized === "gemini-2.5-pro-latest") {
+    return "gemini-2.5-pro";
+  }
+
   if (normalized.startsWith("gemini-")) {
     return normalized;
   }
@@ -37,9 +45,10 @@ function buildDiaryContext(entries) {
 
   return entries
     .map((entry, index) => {
-      const tags = entry.tags?.length ? ` Tags: ${entry.tags.join(", ")}.` : "";
-      const mood = entry.mood ? ` Mood: ${entry.mood}.` : "";
-      return `${index + 1}. ${entry.createdAt.toISOString()}: ${entry.text}${mood}${tags}`;
+      const tagNames = entry.tags?.map((tag) => tag.name).filter(Boolean) || [];
+      const tags = tagNames.length ? ` Tags: ${tagNames.join(", ")}.` : "";
+      const summary = entry.summary ? ` Summary: ${entry.summary}.` : "";
+      return `${index + 1}. ${entry.date.toISOString()}: ${entry.content}${summary}${tags}`;
     })
     .join("\n");
 }
@@ -58,9 +67,10 @@ async function createChatReply(req, res) {
       });
     }
 
-    const recentEntries = await prisma.diaryEntry.findMany({
+    const recentEntries = await prisma.dailyDiary.findMany({
       where: { userId: req.user.userId },
-      orderBy: { createdAt: "desc" },
+      orderBy: { date: "desc" },
+      include: { tags: true },
       take: 5,
     });
 
