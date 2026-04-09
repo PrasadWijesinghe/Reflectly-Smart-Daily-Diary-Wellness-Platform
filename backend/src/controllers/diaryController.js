@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const { generateAISummary } = require("../utils/gemini");
 
 function generateSummary(content) {
   const trimmed = content.trim();
@@ -184,7 +185,9 @@ async function createEntry(req, res) {
     }
 
     const normalizedDate = normalizeDate(date);
-    const summary = generateSummary(content);
+    console.log(`[AI Summary] Generating summary for user ${req.user.userId}, date ${normalizedDate}`);
+    const summary = await generateAISummary(content);
+    console.log(`[AI Summary] Generated: "${summary}"`);
     const tagConnect =
       tagIds && tagIds.length > 0
         ? { connect: tagIds.map((id) => ({ id })) }
@@ -259,7 +262,9 @@ async function updateEntry(req, res) {
     const updateData = {};
     if (content !== undefined) {
       updateData.content = content;
-      updateData.summary = generateSummary(content);
+      console.log(`[AI Summary] Generating summary for entry ${existing.id}, user ${req.user.userId}`);
+      updateData.summary = await generateAISummary(content);
+      console.log(`[AI Summary] Generated: "${updateData.summary}"`);
     }
     if (tagIds !== undefined) {
       updateData.tags = {
