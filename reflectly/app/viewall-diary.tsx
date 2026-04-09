@@ -16,13 +16,14 @@ import { useRouter } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import { getApiUrl } from "../utils/api";
 import MonthPicker from "../components/MonthPicker";
-import DeleteConfirmModal from "../components/DeleteConfirmModal";
+import ConfirmModal from "../components/ConfirmModal";
 
 type Tag = {
   id: number;
   name: string;
   icon: string;
   color: string;
+  count?: number;
 };
 
 type DiaryEntry = {
@@ -33,6 +34,18 @@ type DiaryEntry = {
   tags: Tag[];
   createdAt: string;
   updatedAt: string;
+};
+
+type WeekData = {
+  weekNumber: number;
+  weekStart: string;
+  weekEnd: string;
+  dayCount: number;
+  shortSummary: string;
+  fullSummary: string;
+  topTags: Tag[];
+  mood: string;
+  entryCount: number;
 };
 
 const monthNames = [
@@ -57,13 +70,18 @@ export default function ViewAllDiaryScreen() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
   const [allEntries, setAllEntries] = useState<DiaryEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<DiaryEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [weeklyData, setWeeklyData] = useState<WeekData[]>([]);
+  const [loadingWeekly, setLoadingWeekly] = useState(false);
+  const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [updateTargetId, setUpdateTargetId] = useState<number | null>(null);
 
   // Inline edit state
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -118,6 +136,30 @@ export default function ViewAllDiaryScreen() {
     setEditingId(null);
   }, [allEntries, selectedMonth, selectedYear]);
 
+  useEffect(() => {
+    if (activeTab === "weekly" && token) {
+      fetchWeeklyEntries();
+    }
+  }, [activeTab, selectedMonth, selectedYear, token]);
+
+  const fetchWeeklyEntries = async () => {
+    if (!token) return;
+    try {
+      setLoadingWeekly(true);
+      const res = await fetch(
+        `${getApiUrl()}/diary/weekly?month=${selectedMonth}&year=${selectedYear}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setWeeklyData(data.weeks || []);
+    } catch (err) {
+      console.error("Fetch weekly error:", err);
+    } finally {
+      setLoadingWeekly(false);
+    }
+  };
+
   const handlePrevMonth = () => {
     if (selectedMonth === 0) {
       setSelectedMonth(11);
@@ -159,11 +201,16 @@ export default function ViewAllDiaryScreen() {
     setEditTagIds(entry.tags.map((t) => t.id));
   };
 
-  const handleInlineSave = async (entryId: number) => {
-    if (!token || !editText.trim()) return;
+  const handleInlineSave = (entryId: number) => {
+    if (!editText.trim()) return;
+    setUpdateTargetId(entryId);
+  };
+
+  const confirmUpdate = async () => {
+    if (updateTargetId === null || !token) return;
     try {
       setSaving(true);
-      const res = await fetch(`${getApiUrl()}/diary/${entryId}`, {
+      const res = await fetch(`${getApiUrl()}/diary/${updateTargetId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -175,6 +222,7 @@ export default function ViewAllDiaryScreen() {
         }),
       });
       if (!res.ok) throw new Error("Save failed");
+      setUpdateTargetId(null);
       setEditingId(null);
       fetchEntries();
     } catch (err: any) {
@@ -197,14 +245,23 @@ export default function ViewAllDiaryScreen() {
   };
 
   const entryCount = filteredEntries.length;
+  const weekCount = weeklyData.length;
 
   // Unique tag usage this month
   const tagUsage: Record<string, number> = {};
-  filteredEntries.forEach((e) =>
-    e.tags.forEach((t) => {
-      tagUsage[t.name] = (tagUsage[t.name] || 0) + 1;
-    })
-  );
+  if (activeTab === "daily") {
+    filteredEntries.forEach((e) =>
+      e.tags.forEach((t) => {
+        tagUsage[t.name] = (tagUsage[t.name] || 0) + 1;
+      })
+    );
+  } else {
+    weeklyData.forEach((w) =>
+      w.topTags.forEach((t) => {
+        tagUsage[t.name] = (tagUsage[t.name] || 0) + (t.count || 0);
+      })
+    );
+  }
   const topTag = Object.entries(tagUsage).sort((a, b) => b[1] - a[1])[0];
 
   return (
@@ -231,12 +288,15 @@ export default function ViewAllDiaryScreen() {
         </View>
 
         {/* Stats strip in header */}
-        {!loading && entryCount > 0 && (
+        {(activeTab === "daily" ? entryCount > 0 : weeklyData.length > 0) && (
           <View style={styles.statsRow}>
             <View style={styles.statPill}>
-              <Ionicons name="book" size={12} color="#FFFFFF" />
+              <Ionicons name={activeTab === "daily" ? "book" : "calendar"} size={12} color="#FFFFFF" />
               <Text style={styles.statText}>
-                {entryCount} {entryCount === 1 ? "entry" : "entries"}
+                {activeTab === "daily" 
+                  ? `${entryCount} ${entryCount === 1 ? "entry" : "entries"}`
+                  : `${weekCount} ${weekCount === 1 ? "week" : "weeks"}`
+                }
               </Text>
             </View>
             {topTag && (
@@ -269,33 +329,82 @@ export default function ViewAllDiaryScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Content */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3B82F6" />
-        </View>
-      ) : filteredEntries.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <LinearGradient
-            colors={["#EFF6FF", "#DBEAFE"]}
-            style={styles.emptyIconBg}
-          >
-            <Ionicons name="book-outline" size={44} color="#93C5FD" />
-          </LinearGradient>
-          <Text style={styles.emptyTitle}>No entries yet</Text>
-          <Text style={styles.emptySub}>
-            Your diary entries for {monthNames[selectedMonth]} {selectedYear}{"\n"}
-            will appear here once you start writing.
-          </Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+      {/* Daily / Weekly Toggle */}
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            activeTab === "daily" && styles.toggleButtonActive,
+          ]}
+          onPress={() => setActiveTab("daily")}
         >
-          {filteredEntries.map((entry) => {
-            const d = new Date(entry.date);
+          <Ionicons
+            name="today"
+            size={16}
+            color={activeTab === "daily" ? "#FFFFFF" : "#6B7280"}
+            style={{ marginRight: 6 }}
+          />
+          <Text
+            style={[
+              styles.toggleText,
+              activeTab === "daily" && styles.toggleTextActive,
+            ]}
+          >
+            Daily
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.toggleButton,
+            activeTab === "weekly" && styles.toggleButtonActive,
+          ]}
+          onPress={() => setActiveTab("weekly")}
+        >
+          <Ionicons
+            name="calendar"
+            size={16}
+            color={activeTab === "weekly" ? "#FFFFFF" : "#6B7280"}
+            style={{ marginRight: 6 }}
+          />
+          <Text
+            style={[
+              styles.toggleText,
+              activeTab === "weekly" && styles.toggleTextActive,
+            ]}
+          >
+            Weekly
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      {activeTab === "daily" ? (
+        loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+          </View>
+        ) : filteredEntries.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <LinearGradient
+              colors={["#EFF6FF", "#DBEAFE"]}
+              style={styles.emptyIconBg}
+            >
+              <Ionicons name="book-outline" size={44} color="#93C5FD" />
+            </LinearGradient>
+            <Text style={styles.emptyTitle}>No entries yet</Text>
+            <Text style={styles.emptySub}>
+              Your diary entries for {monthNames[selectedMonth]} {selectedYear}{"\n"}
+              will appear here once you start writing.
+            </Text>
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {filteredEntries.map((entry) => {
+              const d = new Date(entry.date);
             const accent = getAccentColor(entry.tags);
             const isExpanded = expandedId === entry.id;
             const isEditing = editingId === entry.id;
@@ -501,8 +610,100 @@ export default function ViewAllDiaryScreen() {
               </TouchableOpacity>
             );
           })}
-          <View style={{ height: 40 }} />
-        </ScrollView>
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        )
+      ) : (
+        /* ── Weekly View ── */
+        loadingWeekly ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+          </View>
+        ) : weeklyData.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <LinearGradient
+              colors={["#EFF6FF", "#DBEAFE"]}
+              style={styles.emptyIconBg}
+            >
+              <Ionicons name="calendar-outline" size={44} color="#93C5FD" />
+            </LinearGradient>
+            <Text style={styles.emptyTitle}>No weeks yet</Text>
+            <Text style={styles.emptySub}>
+              Your weekly summaries for {monthNames[selectedMonth]} {selectedYear}{"\n"}
+              will appear here once you have enough entries.
+            </Text>
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {weeklyData.map((week) => {
+              const isExpanded = expandedWeek === week.weekNumber;
+              const weekStartDate = new Date(week.weekStart);
+              const weekEndDate = new Date(week.weekEnd);
+
+              return (
+                <TouchableOpacity
+                  key={week.weekNumber}
+                  activeOpacity={0.85}
+                  onPress={() => setExpandedWeek(isExpanded ? null : week.weekNumber)}
+                  style={styles.weekCard}
+                >
+                  <View style={styles.weekHeader}>
+                    <View>
+                      <Text style={styles.weekLabel}>
+                        Week {week.weekNumber}: {monthShort[weekStartDate.getMonth()]} {weekStartDate.getDate()} - {monthShort[weekEndDate.getMonth()]} {weekEndDate.getDate()} ({week.dayCount} days)
+                      </Text>
+                      {week.mood && (
+                        <Text style={styles.weekMood}>{week.mood}</Text>
+                      )}
+                    </View>
+                    <Ionicons
+                      name={isExpanded ? "chevron-up" : "chevron-down"}
+                      size={20}
+                      color="#6B7280"
+                    />
+                  </View>
+
+                  {isExpanded ? (
+                    <View style={styles.weekExpanded}>
+                      <Text style={styles.weekFullSummary}>{week.fullSummary}</Text>
+                      <TouchableOpacity
+                        onPress={() => setExpandedWeek(null)}
+                        style={styles.weekCollapseBtn}
+                      >
+                        <Ionicons name="chevron-up" size={15} color="#6B7280" />
+                        <Text style={styles.weekCollapseText}>Collapse</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <Text style={styles.weekShortSummary} numberOfLines={3}>
+                      {week.shortSummary}
+                    </Text>
+                  )}
+
+                  {week.topTags.length > 0 && (
+                    <View style={styles.weekTags}>
+                      {week.topTags.slice(0, 4).map((tag, idx) => (
+                        <View
+                          key={idx}
+                          style={[styles.weekTag, { backgroundColor: tag.color }]}
+                        >
+                          <Text style={styles.weekTagText}>
+                            {tag.icon} {tag.name}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        )
       )}
 
       {/* Month Picker Modal */}
@@ -518,10 +719,19 @@ export default function ViewAllDiaryScreen() {
       />
 
       {/* Delete Confirmation Modal */}
-      <DeleteConfirmModal
+      <ConfirmModal
         visible={deleteTargetId !== null}
+        type="delete"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTargetId(null)}
+      />
+
+      {/* Update Confirmation Modal */}
+      <ConfirmModal
+        visible={updateTargetId !== null}
+        type="update"
+        onConfirm={confirmUpdate}
+        onCancel={() => setUpdateTargetId(null)}
       />
     </KeyboardAvoidingView>
   );
@@ -610,6 +820,35 @@ const styles = StyleSheet.create({
     color: "#1F2937",
     minWidth: 160,
     textAlign: "center",
+  },
+
+  /* ── Toggle ── */
+  toggleContainer: {
+    flexDirection: "row",
+    backgroundColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 4,
+    marginHorizontal: 14,
+    marginTop: 10,
+  },
+  toggleButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  toggleButtonActive: {
+    backgroundColor: "#3B82F6",
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  toggleTextActive: {
+    color: "#FFFFFF",
   },
 
   /* ── Loading & Empty ── */
@@ -882,5 +1121,79 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#6B7280",
+  },
+
+  /* ── Weekly View ── */
+  weekCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+  },
+  weekHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  weekLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 2,
+  },
+  weekMood: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontStyle: "italic",
+  },
+  weekShortSummary: {
+    fontSize: 13,
+    color: "#4B5563",
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  weekExpanded: {
+    marginBottom: 12,
+  },
+  weekFullSummary: {
+    fontSize: 14,
+    color: "#374151",
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  weekCollapseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+    gap: 4,
+  },
+  weekCollapseText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  weekTags: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  weekTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  weekTagText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });

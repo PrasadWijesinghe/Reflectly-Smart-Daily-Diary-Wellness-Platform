@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
 import { getApiUrl } from "../utils/api";
+import ConfirmModal from "./ConfirmModal";
 
 type RecordingState = "idle" | "recording" | "processing";
 type Tag = { id: number; name: string; icon: string; color: string };
@@ -33,6 +34,7 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
   const [saving, setSaving] = useState(false);
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const recording = useRef<Audio.Recording | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -41,6 +43,14 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
     if (!diaryText.trim()) return Alert.alert("Empty Entry", "Please write something before saving.");
     if (!token) return Alert.alert("Error", "You must be logged in to save entries.");
 
+    if (entry) {
+      setShowUpdateModal(true);
+    } else {
+      await saveEntry();
+    }
+  };
+
+  const saveEntry = async () => {
     try {
       setSaving(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -244,6 +254,13 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
           <Text style={styles.saveButtonText}>{saving ? "Saving..." : entry ? "Update Entry" : "Save Entry"}</Text>
         </View>
       </TouchableOpacity>
+
+      <ConfirmModal
+        visible={showUpdateModal}
+        type="update"
+        onConfirm={saveEntry}
+        onCancel={() => setShowUpdateModal(false)}
+      />
     </View>
   );
 }
