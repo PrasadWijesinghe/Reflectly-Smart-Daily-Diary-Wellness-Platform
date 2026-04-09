@@ -4,17 +4,20 @@ const prisma = require("./utils/prisma");
 
 const DEFAULT_TAGS = [
   { name: "Study", icon: "📖", color: "#3B82F6" },
-  { name: "Exams", icon: "📝", color: "#8B5CF6" },
-  { name: "Stress", icon: "😰", color: "#F59E0B" },
-  { name: "Win!", icon: "🏆", color: "#EF4444" },
-  { name: "Personal", icon: "💜", color: "#EC4899" },
+  { name: "Exams", icon: "📝", color: "#06B6D4" },
+  { name: "Stress", icon: "😰", color: "#EF4444" },
+  { name: "Win!", icon: "🏆", color: "#B45309" },
+  { name: "Growth", icon: "🌱", color: "#EAB308" },
+  { name: "Rest", icon: "🛏️", color: "#FDBA74" },
+  { name: "Health", icon: "💚", color: "#22C55E" },
+  { name: "Work", icon: "💼", color: "#4B5563" },
 ];
 
 async function seed() {
   for (const tag of DEFAULT_TAGS) {
     await prisma.tag.upsert({
       where: { name: tag.name },
-      update: {},
+      update: { icon: tag.icon, color: tag.color },
       create: tag,
     });
     console.log(`Tag "${tag.name}" seeded.`);

@@ -1,5 +1,6 @@
 const prisma = require("../utils/prisma");
 const { generateAISummary } = require("../utils/gemini");
+const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
 
 function generateSummary(content) {
   const trimmed = content.trim();
@@ -217,6 +218,9 @@ async function createEntry(req, res) {
       include: { tags: true },
     });
 
+    await invalidateWeekCache(req.user.userId, normalizedDate);
+    regenerateWeekSummary(req.user.userId, normalizedDate).catch(console.error);
+
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {
     if (err.code === "P2002") {
@@ -278,6 +282,9 @@ async function updateEntry(req, res) {
       include: { tags: true },
     });
 
+    await invalidateWeekCache(req.user.userId, existing.date);
+    regenerateWeekSummary(req.user.userId, existing.date).catch(console.error);
+
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
     console.error("UpdateEntry error:", err);
@@ -296,6 +303,9 @@ async function deleteEntry(req, res) {
     }
 
     await prisma.dailyDiary.delete({ where: { id: existing.id } });
+
+    await invalidateWeekCache(req.user.userId, existing.date);
+    regenerateWeekSummary(req.user.userId, existing.date).catch(console.error);
 
     res.json({ message: "Entry deleted." });
   } catch (err) {
