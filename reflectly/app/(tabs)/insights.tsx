@@ -8,12 +8,19 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const EMPTY_MOODS: Record<string, string> = { Mon: "—", Tue: "—", Wed: "—", Thu: "—", Fri: "—", Sat: "—", Sun: "—" };
 const EMPTY_STRESS: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
 
+const WEEKS = ["Wk 1", "Wk 2", "Wk 3", "Wk 4"];
+const EMPTY_WEEK_MOODS: Record<string, string> = { "Wk 1": "—", "Wk 2": "—", "Wk 3": "—", "Wk 4": "—" };
+const EMPTY_WEEK_STRESS: Record<string, number> = { "Wk 1": 0, "Wk 2": 0, "Wk 3": 0, "Wk 4": 0 };
+
 export default function InsightsScreen() {
   const { token } = useAuth();
   const [activeTab, setActiveTab] = useState<"7days" | "30days">("7days");
   const [moodData, setMoodData] = useState<Record<string, string>>(EMPTY_MOODS);
   const [stressData, setStressData] = useState<Record<string, number>>(EMPTY_STRESS);
   const [topicsData, setTopicsData] = useState<{ label: string; emoji: string; count: number; color: string; pct: number }[]>([]);
+  const [weeklyMoodData, setWeeklyMoodData] = useState<Record<string, string>>(EMPTY_WEEK_MOODS);
+  const [weeklyStressData, setWeeklyStressData] = useState<Record<string, number>>(EMPTY_WEEK_STRESS);
+  const [weeklyTopicsData, setWeeklyTopicsData] = useState<{ label: string; emoji: string; count: number; color: string; pct: number }[]>([]);
 
   React.useEffect(() => {
     if (!token) return;
@@ -28,49 +35,129 @@ export default function InsightsScreen() {
 
         const nextMoods = { ...EMPTY_MOODS };
         const nextStress = { ...EMPTY_STRESS };
-        const topicCounts: Record<string, number> = {};
+        const topicCounts7: Record<string, number> = {};
+
+        const nextWeekMoods = { ...EMPTY_WEEK_MOODS };
+        const nextWeekStress = { ...EMPTY_WEEK_STRESS };
+        const topicCounts30: Record<string, number> = {};
+
         const topicEmoji: Record<string, string> = {};
         const topicColor: Record<string, string> = {};
+        
+        const weekStressCounts: Record<string, { sum: number; count: number }> = {
+            "Wk 1": { sum: 0, count: 0 },
+            "Wk 2": { sum: 0, count: 0 },
+            "Wk 3": { sum: 0, count: 0 },
+            "Wk 4": { sum: 0, count: 0 },
+        };
+        const weekMoodCounts: Record<string, { good: number, bad: number, neutral: number }> = {
+            "Wk 1": { good: 0, bad: 0, neutral: 0 },
+            "Wk 2": { good: 0, bad: 0, neutral: 0 },
+            "Wk 3": { good: 0, bad: 0, neutral: 0 },
+            "Wk 4": { good: 0, bad: 0, neutral: 0 },
+        };
+
+        const now = new Date();
+        now.setHours(23, 59, 59, 999);
 
         (data.entries || []).forEach((entry: any) => {
-          const day = new Date(entry.date).toLocaleDateString("en-US", { weekday: "short" });
+          const entryDate = new Date(entry.date);
+          const diffDiff = now.getTime() - entryDate.getTime();
+          const diffDays = Math.floor(diffDiff / (1000 * 60 * 60 * 24));
+          
           const content = `${entry.content || ""} ${entry.summary || ""}`.toLowerCase();
-          if (content.includes("happy") || content.includes("great") || content.includes("hopeful")) nextMoods[day] = "😄";
-          else if (content.includes("anxious") || content.includes("stress")) nextMoods[day] = "😟";
-          else if (content.includes("calm")) nextMoods[day] = "😌";
-          else if (content.includes("tired")) nextMoods[day] = "😴";
-          else if (entry.content) nextMoods[day] = "🙂";
+          
+          let moodVal = "—";
+          let moodType = "neutral";
+          if (content.includes("happy") || content.includes("great") || content.includes("hopeful")) { moodVal = "😄"; moodType = "good"; }
+          else if (content.includes("anxious") || content.includes("stress")) { moodVal = "😟"; moodType = "bad"; }
+          else if (content.includes("calm")) { moodVal = "😌"; moodType = "good"; }
+          else if (content.includes("tired")) { moodVal = "😴"; moodType = "bad"; }
+          else if (entry.content) { moodVal = "🙂"; moodType = "neutral"; }
 
-          if (content.includes("anxious") || content.includes("stress")) nextStress[day] = 75;
-          else if (content.includes("tired")) nextStress[day] = 45;
-          else if (entry.content) nextStress[day] = 25;
+          let stressVal = 0;
+          if (content.includes("anxious") || content.includes("stress")) stressVal = 75;
+          else if (content.includes("tired")) stressVal = 45;
+          else if (entry.content) stressVal = 25;
 
-          (entry.tags || []).forEach((tag: any) => {
-            topicCounts[tag.name] = (topicCounts[tag.name] || 0) + 1;
-            topicEmoji[tag.name] = tag.icon || "🏷️";
-            topicColor[tag.name] = tag.color || "#3B82F6";
-          });
+          if (diffDays < 7) {
+            const day = entryDate.toLocaleDateString("en-US", { weekday: "short" });
+            if (DAYS.includes(day)) {
+                nextMoods[day] = moodVal;
+                nextStress[day] = stressVal;
+            }
+            
+            (entry.tags || []).forEach((tag: any) => {
+                topicCounts7[tag.name] = (topicCounts7[tag.name] || 0) + 1;
+                topicEmoji[tag.name] = tag.icon || "🏷️";
+                topicColor[tag.name] = tag.color || "#3B82F6";
+            });
+          }
+
+          if (diffDays < 28) {
+             let weekKey = "";
+             if (diffDays < 7) weekKey = "Wk 4";
+             else if (diffDays < 14) weekKey = "Wk 3";
+             else if (diffDays < 21) weekKey = "Wk 2";
+             else if (diffDays < 28) weekKey = "Wk 1";
+
+             if (weekKey) {
+                 weekStressCounts[weekKey].sum += stressVal;
+                 weekStressCounts[weekKey].count += 1;
+
+                 if (moodType === "good") weekMoodCounts[weekKey].good++;
+                 else if (moodType === "bad") weekMoodCounts[weekKey].bad++;
+                 else weekMoodCounts[weekKey].neutral++;
+             }
+
+            (entry.tags || []).forEach((tag: any) => {
+                topicCounts30[tag.name] = (topicCounts30[tag.name] || 0) + 1;
+                topicEmoji[tag.name] = tag.icon || "🏷️";
+                topicColor[tag.name] = tag.color || "#3B82F6";
+            });
+          }
         });
 
-        const sortedTopics = Object.keys(topicCounts)
-          .map((name) => ({
-            label: name,
-            emoji: topicEmoji[name] || "🏷️",
-            count: topicCounts[name],
-            color: topicColor[name] || "#3B82F6",
-            pct: 0,
-          }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 6);
-
-        const maxCount = sortedTopics[0]?.count || 1;
-        sortedTopics.forEach((item) => {
-          item.pct = Math.round((item.count / maxCount) * 100);
+        WEEKS.forEach(wk => {
+            if (weekStressCounts[wk].count > 0) {
+                nextWeekStress[wk] = Math.round(weekStressCounts[wk].sum / weekStressCounts[wk].count);
+            }
+            
+            const mc = weekMoodCounts[wk];
+            if (mc.good === 0 && mc.bad === 0 && mc.neutral === 0) {
+                nextWeekMoods[wk] = "—";
+            } else if (mc.good >= mc.bad && mc.good >= mc.neutral) {
+                nextWeekMoods[wk] = "😄";
+            } else if (mc.bad >= mc.good && mc.bad >= mc.neutral) {
+                nextWeekMoods[wk] = "😟";
+            } else {
+                nextWeekMoods[wk] = "🙂"; // neutral
+            }
         });
+
+        const sortTopics = (counts: Record<string, number>) => {
+            const sorted = Object.keys(counts)
+                .map((name) => ({
+                    label: name,
+                    emoji: topicEmoji[name] || "🏷️",
+                    count: counts[name],
+                    color: topicColor[name] || "#3B82F6",
+                    pct: 0,
+                }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 6);
+            const maxCount = sorted[0]?.count || 1;
+            sorted.forEach(item => { item.pct = Math.round((item.count / maxCount) * 100); });
+            return sorted;
+        };
 
         setMoodData(nextMoods);
         setStressData(nextStress);
-        setTopicsData(sortedTopics);
+        setTopicsData(sortTopics(topicCounts7));
+
+        setWeeklyMoodData(nextWeekMoods);
+        setWeeklyStressData(nextWeekStress);
+        setWeeklyTopicsData(sortTopics(topicCounts30));
       } catch (err) {
         console.error("Fetch insights entries error:", err);
       }
@@ -142,10 +229,10 @@ export default function InsightsScreen() {
             <Text style={styles.cardTitle}>Mood Trend</Text>
           </View>
           <View style={styles.moodRow}>
-            {DAYS.map((day) => (
-              <View key={day} style={styles.moodItem}>
-                <Text style={styles.moodEmoji}>{moodData[day]}</Text>
-                <Text style={styles.moodDay}>{day}</Text>
+            {(activeTab === "7days" ? DAYS : WEEKS).map((key) => (
+              <View key={key} style={styles.moodItem}>
+                <Text style={styles.moodEmoji}>{activeTab === "7days" ? moodData[key] : weeklyMoodData[key]}</Text>
+                <Text style={styles.moodDay}>{key}</Text>
               </View>
             ))}
           </View>
@@ -157,22 +244,26 @@ export default function InsightsScreen() {
             <Text style={styles.cardTitle}>Stress Levels</Text>
           </View>
           <View style={styles.stressChart}>
-            {DAYS.map((day) => {
-              const val = stressData[day] || 0;
+            {(activeTab === "7days" ? DAYS : WEEKS).map((key) => {
+              const val = (activeTab === "7days" ? stressData[key] : weeklyStressData[key]) || 0;
               const height = (val / 100) * 80;
               const isHigh = val >= 65;
               return (
-                <View key={day} style={styles.stressBarWrap}>
+                <View key={key} style={styles.stressBarWrap}>
                   <View style={styles.stressBarBg}>
                     <View style={[styles.stressBar, { height, backgroundColor: isHigh ? "#F59E0B" : "#3B82F6" }]} />
                   </View>
-                  <Text style={styles.stressDay}>{day}</Text>
+                  <Text style={styles.stressDay}>{key}</Text>
                 </View>
               );
             })}
           </View>
           <View style={styles.stressTip}>
-            <Text style={styles.stressTipText}>Tip: Higher-stress days are a great time for a quick reset 🎮</Text>
+            <Text style={styles.stressTipText}>
+              {activeTab === "7days" 
+                ? "Tip: Higher-stress days are a great time for a quick reset \uD83C\uDFAE"
+                : "Tip: Notice how your stress fluctuates week over week \uD83D\uDCC5"}
+            </Text>
           </View>
         </View>
 
@@ -181,10 +272,10 @@ export default function InsightsScreen() {
             <Text style={{ fontSize: 16 }}>✍️</Text>
             <Text style={styles.cardTitle}>What You Wrote About</Text>
           </View>
-          {topicsData.length === 0 ? (
+          {(activeTab === "7days" ? topicsData : weeklyTopicsData).length === 0 ? (
             <Text style={{ textAlign: "center", color: "#9CA3AF", marginTop: 10 }}>No tagged topics yet.</Text>
           ) : (
-            topicsData.map((topic, index) => (
+            (activeTab === "7days" ? topicsData : weeklyTopicsData).map((topic, index) => (
               <View key={index} style={styles.topicRow}>
                 <View style={styles.topicLabel}>
                   <Text style={{ fontSize: 16 }}>{topic.emoji}</Text>
