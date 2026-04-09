@@ -41,3 +41,9 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Debug & error logs
+*.log
+*.txt
+out.txt
+error.log

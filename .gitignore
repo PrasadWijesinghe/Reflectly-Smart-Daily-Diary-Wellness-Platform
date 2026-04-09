@@ -60,3 +60,6 @@ backend/uploads/
 
 backend/.env
 
+# Debug & error logs (root level)
+git_diff.txt
+*.log
