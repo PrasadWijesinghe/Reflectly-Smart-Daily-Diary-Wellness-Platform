@@ -2,6 +2,7 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { View } from "react-native";
 import FloatingChatButton from "../../components/FloatingChatButton";
+import FloatingReminderButton from "../../components/FloatingReminderButton";
 
 export default function TabLayout() {
   return (
@@ -40,20 +41,11 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color, size, focused }) => (
-            <View
-              style={{
-                backgroundColor: focused ? "#DBEAFE" : "transparent",
-                borderRadius: 20,
-                paddingHorizontal: 16,
-                paddingVertical: 6,
-              }}
-            >
-              <Ionicons
-                name={focused ? "home" : "home-outline"}
-                size={22}
-                color={color}
-              />
-            </View>
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
@@ -63,20 +55,11 @@ export default function TabLayout() {
         options={{
           title: "Diary",
           tabBarIcon: ({ color, size, focused }) => (
-            <View
-              style={{
-                backgroundColor: focused ? "#DBEAFE" : "transparent",
-                borderRadius: 20,
-                paddingHorizontal: 16,
-                paddingVertical: 6,
-              }}
-            >
-              <Ionicons
-                name={focused ? "book" : "book-outline"}
-                size={22}
-                color={color}
-              />
-            </View>
+            <Ionicons
+              name={focused ? "book" : "book-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
@@ -87,20 +70,11 @@ export default function TabLayout() {
           href: null,
           title: "Games",
           tabBarIcon: ({ color, size, focused }) => (
-            <View
-              style={{
-                backgroundColor: focused ? "#DBEAFE" : "transparent",
-                borderRadius: 20,
-                paddingHorizontal: 16,
-                paddingVertical: 6,
-              }}
-            >
-              <Ionicons
-                name={focused ? "game-controller" : "game-controller-outline"}
-                size={22}
-                color={color}
-              />
-            </View>
+            <Ionicons
+              name={focused ? "game-controller" : "game-controller-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
@@ -110,20 +84,11 @@ export default function TabLayout() {
         options={{
           title: "Insights",
           tabBarIcon: ({ color, size, focused }) => (
-            <View
-              style={{
-                backgroundColor: focused ? "#DBEAFE" : "transparent",
-                borderRadius: 20,
-                paddingHorizontal: 16,
-                paddingVertical: 6,
-              }}
-            >
-              <Ionicons
-                name={focused ? "bar-chart" : "bar-chart-outline"}
-                size={22}
-                color={color}
-              />
-            </View>
+            <Ionicons
+              name={focused ? "bar-chart" : "bar-chart-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
@@ -133,24 +98,16 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size, focused }) => (
-            <View
-              style={{
-                backgroundColor: focused ? "#DBEAFE" : "transparent",
-                borderRadius: 20,
-                paddingHorizontal: 16,
-                paddingVertical: 6,
-              }}
-            >
-              <Ionicons
-                name={focused ? "person" : "person-outline"}
-                size={22}
-                color={color}
-              />
-            </View>
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
     </Tabs>
+    <FloatingReminderButton />
     <FloatingChatButton />
     </View>
   );
