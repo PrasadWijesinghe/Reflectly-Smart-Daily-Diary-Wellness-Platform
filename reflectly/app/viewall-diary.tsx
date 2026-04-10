@@ -56,6 +56,34 @@ const monthShort = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
+
+function getOrdinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+const moodColors: Record<string, string> = {
+  "😄": "#10B981",
+  "😃": "#10B981",
+  "😊": "#10B981",
+  "🥳": "#10B981",
+  "😌": "#10B981",
+  "🙂": "#F59E0B",
+  "😐": "#F59E0B",
+  "😫": "#EF4444",
+  "😟": "#EF4444",
+  "😴": "#EF4444",
+  "😔": "#EF4444",
+};
+
+function getMoodColor(mood?: string): string {
+  if (!mood) return "#3B82F6";
+  const emojiMatch = mood.match(/[\u{1F300}-\u{1F9FF}]/u);
+  const emoji = emojiMatch ? emojiMatch[0] : null;
+  return emoji ? moodColors[emoji] || "#3B82F6" : "#3B82F6";
+}
+
 const dayShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function getAccentColor(tags: Tag[]): string {
@@ -651,53 +679,57 @@ export default function ViewAllDiaryScreen() {
                   onPress={() => setExpandedWeek(isExpanded ? null : week.weekNumber)}
                   style={styles.weekCard}
                 >
-                  <View style={styles.weekHeader}>
-                    <View>
-                      <Text style={styles.weekLabel}>
-                        Week {week.weekNumber}: {monthShort[weekStartDate.getMonth()]} {weekStartDate.getDate()} - {monthShort[weekEndDate.getMonth()]} {weekEndDate.getDate()} ({week.dayCount} days)
-                      </Text>
-                      {week.mood && (
-                        <Text style={styles.weekMood}>{week.mood}</Text>
-                      )}
-                    </View>
-                    <Ionicons
-                      name={isExpanded ? "chevron-up" : "chevron-down"}
-                      size={20}
-                      color="#6B7280"
-                    />
-                  </View>
+                  <View style={[styles.accentStrip, { backgroundColor: getMoodColor(week.mood) }]} />
 
-                  {isExpanded ? (
-                    <View style={styles.weekExpanded}>
-                      <Text style={styles.weekFullSummary}>{week.fullSummary}</Text>
-                      <TouchableOpacity
-                        onPress={() => setExpandedWeek(null)}
-                        style={styles.weekCollapseBtn}
-                      >
-                        <Ionicons name="chevron-up" size={15} color="#6B7280" />
-                        <Text style={styles.weekCollapseText}>Collapse</Text>
-                      </TouchableOpacity>
+                  <View style={styles.cardBody}>
+                    <View style={styles.weekHeader}>
+                      <View>
+                        <Text style={styles.weekLabel}>
+                          {getOrdinal(weekStartDate.getDate())} - {getOrdinal(weekEndDate.getDate())} {monthShort[weekEndDate.getMonth()]}
+                        </Text>
+                        {week.mood && (
+                          <Text style={styles.weekMood}>{week.mood}</Text>
+                        )}
+                      </View>
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color="#6B7280"
+                      />
                     </View>
-                  ) : (
-                    <Text style={styles.weekShortSummary} numberOfLines={3}>
-                      {week.shortSummary}
-                    </Text>
-                  )}
 
-                  {week.topTags.length > 0 && (
-                    <View style={styles.weekTags}>
-                      {week.topTags.slice(0, 4).map((tag, idx) => (
-                        <View
-                          key={idx}
-                          style={[styles.weekTag, { backgroundColor: tag.color }]}
+                    {isExpanded ? (
+                      <View style={styles.weekExpanded}>
+                        <Text style={styles.weekFullSummary}>{week.fullSummary}</Text>
+                        <TouchableOpacity
+                          onPress={() => setExpandedWeek(null)}
+                          style={styles.weekCollapseBtn}
                         >
-                          <Text style={styles.weekTagText}>
-                            {tag.icon} {tag.name}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
+                          <Ionicons name="chevron-up" size={15} color="#6B7280" />
+                          <Text style={styles.weekCollapseText}>Collapse</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <Text style={styles.weekShortSummary} numberOfLines={3}>
+                        {week.shortSummary}
+                      </Text>
+                    )}
+
+                    {week.topTags.length > 0 && (
+                      <View style={styles.weekTags}>
+                        {week.topTags.slice(0, 4).map((tag, idx) => (
+                          <View
+                            key={idx}
+                            style={[styles.weekTag, { backgroundColor: tag.color }]}
+                          >
+                            <Text style={styles.weekTagText}>
+                              {tag.icon} {tag.name}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -1125,10 +1157,11 @@ const styles = StyleSheet.create({
 
   /* ── Weekly View ── */
   weekCard: {
+    flexDirection: "row",
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 16,
     marginBottom: 12,
+    overflow: "hidden",
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
