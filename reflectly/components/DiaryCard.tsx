@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { DeviceEventEmitter, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getApiUrl } from "../utils/api";
-import ConfirmModal from "./ConfirmModal";
+import DeleteConfirmModal from "./DeleteConfirmModal";
+import { DIARY_UPDATED_EVENT } from "../utils/notifications";
 
 type Tag = {
   id: number;
@@ -50,6 +51,7 @@ export default function DiaryCard({ entry, token, onEdit, onDelete }: Props) {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Delete failed");
+      DeviceEventEmitter.emit(DIARY_UPDATED_EVENT);
       onDelete();
     } catch (err: any) {
       console.error("Delete error:", err);
