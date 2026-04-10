@@ -3,6 +3,7 @@ import { DeviceEventEmitter, View, Text, TouchableOpacity, StyleSheet } from "re
 import { Ionicons } from "@expo/vector-icons";
 import { getApiUrl } from "../utils/api";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import ConfirmModal from "./ConfirmModal";
 import { DIARY_UPDATED_EVENT } from "../utils/notifications";
 
 type Tag = {

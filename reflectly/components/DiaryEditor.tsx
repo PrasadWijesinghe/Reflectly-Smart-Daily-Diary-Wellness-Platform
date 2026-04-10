@@ -15,6 +15,7 @@ import * as Haptics from "expo-haptics";
 import { DeviceEventEmitter } from "react-native";
 import { getApiUrl } from "../utils/api";
 import { DIARY_UPDATED_EVENT } from "../utils/notifications";
+import ConfirmModal from "./ConfirmModal";
 
 type RecordingState = "idle" | "recording" | "processing";
 type Tag = { id: number; name: string; icon: string; color: string };

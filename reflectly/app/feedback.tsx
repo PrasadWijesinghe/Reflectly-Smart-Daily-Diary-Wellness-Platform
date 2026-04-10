@@ -40,7 +40,7 @@ export default function FeedbackScreen() {
       Alert.alert("Success", "Thank you for your feedback! It has been successfully submitted anonymously.", [
         { text: "OK", onPress: () => router.back() },
       ]);
-    } catch (err) {
+    } catch {
       Alert.alert("Error", "Failed to send feedback. Please try again later.");
     } finally {
       setIsSubmitting(false);
@@ -62,7 +62,7 @@ export default function FeedbackScreen() {
 
       <View style={styles.content}>
         <Text style={styles.subtitle}>
-          We'd love to hear your thoughts, feature requests, or bug reports! Your feedback is 100% anonymous.
+          We&apos;d love to hear your thoughts, feature requests, or bug reports! Your feedback is 100% anonymous.
         </Text>
 
         <TextInput

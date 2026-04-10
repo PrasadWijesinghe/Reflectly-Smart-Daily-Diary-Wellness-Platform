@@ -204,56 +204,8 @@ export default function DiaryScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* Daily / Weekly Toggle */}
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              activeTab === "daily" && { backgroundColor: theme.primary },
-            ]}
-            onPress={() => setActiveTab("daily")}
-          >
-            <Ionicons
-              name="today"
-              size={16}
-              color={activeTab === "daily" ? "#FFFFFF" : "#6B7280"}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={[
-                styles.toggleText,
-                activeTab === "daily" && styles.toggleTextActive,
-              ]}
-            >
-              Daily
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              activeTab === "weekly" && { backgroundColor: theme.primary },
-            ]}
-            onPress={() => setActiveTab("weekly")}
-          >
-            <Ionicons
-              name="calendar"
-              size={16}
-              color={activeTab === "weekly" ? "#FFFFFF" : "#6B7280"}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={[
-                styles.toggleText,
-                activeTab === "weekly" && styles.toggleTextActive,
-              ]}
-            >
-              Weekly
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Selected Date */}
-        <View style={[styles.dateCard, { backgroundColor: theme.surface }]}>
+        <View style={[styles.dateCard, { backgroundColor: "#FFFFFF" }]}>
           <View>
             <Text style={styles.dateLabel}>
               {isToday ? "Today" : formatDate(selectedDate)}
@@ -315,7 +267,7 @@ export default function DiaryScreen() {
           pastEntries.map((entry) => (
             <TouchableOpacity
               key={entry.id}
-              style={[styles.pastEntryCard, { backgroundColor: theme.surface }]}
+              style={[styles.pastEntryCard, { backgroundColor: theme.primarySoft }]}
               onPress={() => handleDateSelect(toDateString(new Date(entry.date)))}
             >
               <View style={styles.pastEntryTop}>
@@ -329,7 +281,7 @@ export default function DiaryScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
               </View>
-              <Text style={[styles.pastEntryText, { color: theme.primaryDark }]}>{entry.summary}</Text>
+              <Text style={[styles.pastEntryText, { color: "#1F2937" }]}>{entry.summary}</Text>
               <View style={styles.pastEntryTags}>
                 {entry.tags.map((tag) => (
                   <View
@@ -452,7 +404,6 @@ const styles = StyleSheet.create({
     color: "#3B82F6",
   },
   pastEntryCard: {
-    backgroundColor: "#FFFBEB",
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
