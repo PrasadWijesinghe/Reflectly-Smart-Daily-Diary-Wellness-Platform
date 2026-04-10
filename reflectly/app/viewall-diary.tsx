@@ -158,7 +158,7 @@ export default function ViewAllDiaryScreen() {
       const d = new Date(e.date);
       return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
     });
-    filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     setFilteredEntries(filtered);
     setExpandedId(null);
     setEditingId(null);
