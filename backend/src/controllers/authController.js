@@ -10,6 +10,18 @@ const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 const otpStore = new Map();
 const forgotPasswordOtpStore = new Map();
+const APP_LOCK_PIN_REGEX = /^\d{4}$/;
+const APP_LOCK_PASSWORD_MIN_LENGTH = 6;
+
+function serializeUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    appLockEnabled: Boolean(user.appLockEnabled),
+    appLockType: user.appLockType || null,
+  };
+}
 
 function isValidEmail(email) {
   return EMAIL_REGEX.test(String(email || "").trim());
@@ -48,6 +60,26 @@ function getRemainingCooldownMs(store, email) {
   if (!record) return 0;
   const elapsed = Date.now() - record.lastSentAt;
   return Math.max(0, OTP_RESEND_COOLDOWN_MS - elapsed);
+}
+
+function validateAppLock(type, secret) {
+  if (!type || !secret) {
+    return "Lock type and value are required.";
+  }
+
+  if (type === "pin") {
+    return APP_LOCK_PIN_REGEX.test(String(secret).trim())
+      ? null
+      : "PIN must be exactly 4 digits.";
+  }
+
+  if (type === "password") {
+    return String(secret).length >= APP_LOCK_PASSWORD_MIN_LENGTH
+      ? null
+      : "App password must be at least 6 characters.";
+  }
+
+  return "Lock type must be pin or password.";
 }
 
 const sendRegistrationOtp = async (req, res) => {
@@ -303,7 +335,7 @@ const register = async (req, res) => {
     res.status(201).json({
       message: "User registered successfully.",
       token,
-      user: { id: user.id, name: user.name, email: user.email },
+      user: serializeUser(user),
     });
   } catch (err) {
     console.error("Register error:", err);
@@ -351,7 +383,7 @@ const login = async (req, res) => {
     res.json({
       message: "Login successful.",
       token,
-      user: { id: user.id, name: user.name, email: user.email },
+      user: serializeUser(user),
     });
   } catch (err) {
     console.error("Login error:", err);
@@ -364,7 +396,14 @@ const getMe = async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.userId },
-      select: { id: true, name: true, email: true, createdAt: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        appLockEnabled: true,
+        appLockType: true,
+      },
     });
 
     if (!user) {
@@ -378,10 +417,105 @@ const getMe = async (req, res) => {
   }
 };
 
+const setupAppLock = async (req, res) => {
+  try {
+    const { type, secret } = req.body;
+    const validationError = validateAppLock(type, secret);
+
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
+    }
+
+    const hash = await bcrypt.hash(String(secret), 10);
+
+    const user = await prisma.user.update({
+      where: { id: req.user.userId },
+      data: {
+        appLockEnabled: true,
+        appLockType: type,
+        appLockHash: hash,
+      },
+    });
+
+    return res.json({
+      message: "App lock updated.",
+      user: serializeUser(user),
+    });
+  } catch (err) {
+    console.error("SetupAppLock error:", err);
+    return res.status(500).json({ error: "Failed to update app lock." });
+  }
+};
+
+const disableAppLock = async (req, res) => {
+  try {
+    const user = await prisma.user.update({
+      where: { id: req.user.userId },
+      data: {
+        appLockEnabled: false,
+        appLockType: null,
+        appLockHash: null,
+      },
+    });
+
+    return res.json({
+      message: "App lock disabled.",
+      user: serializeUser(user),
+    });
+  } catch (err) {
+    console.error("DisableAppLock error:", err);
+    return res.status(500).json({ error: "Failed to disable app lock." });
+  }
+};
+
+const verifyAppLock = async (req, res) => {
+  try {
+    const { secret } = req.body;
+
+    if (!secret) {
+      return res.status(400).json({ error: "Lock value is required." });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        appLockEnabled: true,
+        appLockType: true,
+        appLockHash: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    if (!user.appLockEnabled || !user.appLockHash) {
+      return res.status(400).json({ error: "App lock is not enabled." });
+    }
+
+    const isMatch = await bcrypt.compare(String(secret), user.appLockHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Incorrect app lock value." });
+    }
+
+    return res.json({
+      message: "App lock verified.",
+      appLockType: user.appLockType || null,
+    });
+  } catch (err) {
+    console.error("VerifyAppLock error:", err);
+    return res.status(500).json({ error: "Failed to verify app lock." });
+  }
+};
+
 module.exports = {
   register,
   login,
   getMe,
+  setupAppLock,
+  disableAppLock,
+  verifyAppLock,
   sendRegistrationOtp,
   sendForgotPasswordOtp,
   verifyForgotPasswordOtp,
