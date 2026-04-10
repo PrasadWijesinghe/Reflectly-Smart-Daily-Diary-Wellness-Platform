@@ -62,7 +62,6 @@ export default function DiaryScreen() {
   const router = useRouter();
   const today = toDateString(new Date());
 
-  const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
   const [selectedDate, setSelectedDate] = useState(today);
   const [currentEntry, setCurrentEntry] = useState<DiaryEntry | null>(null);
   const [loadingEntry, setLoadingEntry] = useState(true);
@@ -405,32 +404,6 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     paddingHorizontal: 16,
-  },
-  toggleContainer: {
-    flexDirection: "row",
-    backgroundColor: "#E5E7EB",
-    borderRadius: 12,
-    padding: 4,
-    marginTop: 16,
-  },
-  toggleButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  toggleButtonActive: {
-    backgroundColor: "#3B82F6",
-  },
-  toggleText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6B7280",
-  },
-  toggleTextActive: {
-    color: "#FFFFFF",
   },
   dateCard: {
     backgroundColor: "#FFFFFF",

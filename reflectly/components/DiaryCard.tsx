@@ -97,8 +97,9 @@ export default function DiaryCard({ entry, token, onEdit, onDelete }: Props) {
         )}
       </View>
 
-      <DeleteConfirmModal
+      <ConfirmModal
         visible={showDeleteModal}
+        type="delete"
         onConfirm={handleConfirmDelete}
         onCancel={() => setShowDeleteModal(false)}
       />

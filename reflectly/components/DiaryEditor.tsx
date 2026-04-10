@@ -35,6 +35,7 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
   const [saving, setSaving] = useState(false);
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const recording = useRef<Audio.Recording | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -43,6 +44,14 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
     if (!diaryText.trim()) return Alert.alert("Empty Entry", "Please write something before saving.");
     if (!token) return Alert.alert("Error", "You must be logged in to save entries.");
 
+    if (entry) {
+      setShowUpdateModal(true);
+    } else {
+      await saveEntry();
+    }
+  };
+
+  const saveEntry = async () => {
     try {
       setSaving(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -247,6 +256,13 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
           <Text style={styles.saveButtonText}>{saving ? "Saving..." : entry ? "Update Entry" : "Save Entry"}</Text>
         </View>
       </TouchableOpacity>
+
+      <ConfirmModal
+        visible={showUpdateModal}
+        type="update"
+        onConfirm={saveEntry}
+        onCancel={() => setShowUpdateModal(false)}
+      />
     </View>
   );
 }
@@ -272,10 +288,10 @@ const styles = StyleSheet.create({
   tagSection: { marginTop: 14 },
   tagHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   tagHeaderText: { fontSize: 15, fontWeight: "600", color: "#1F2937", marginLeft: 6 },
-  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tagChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#FFFFFF", borderWidth: 1.5, borderColor: "#E5E7EB", gap: 6 },
-  tagChipText: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
-  saveButtonContainer: { marginTop: 18 },
-  saveButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", borderRadius: 14, paddingVertical: 16, backgroundColor: "#3B82F6" },
-  saveButtonText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  tagChip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, backgroundColor: "#FFFFFF", borderWidth: 1.5, borderColor: "#E5E7EB", gap: 4 },
+  tagChipText: { fontSize: 11, fontWeight: "600", color: "#6B7280" },
+  saveButtonContainer: { marginTop: 14 },
+  saveButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", borderRadius: 12, paddingVertical: 12, backgroundColor: "#3B82F6" },
+  saveButtonText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
 });
