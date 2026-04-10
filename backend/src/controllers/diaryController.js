@@ -218,8 +218,7 @@ async function createEntry(req, res) {
       include: { tags: true },
     });
 
-    await invalidateWeekCache(req.user.userId, normalizedDate);
-    regenerateWeekSummary(req.user.userId, normalizedDate).catch(console.error);
+    await regenerateWeekSummary(req.user.userId, normalizedDate);
 
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {
@@ -282,8 +281,7 @@ async function updateEntry(req, res) {
       include: { tags: true },
     });
 
-    await invalidateWeekCache(req.user.userId, existing.date);
-    regenerateWeekSummary(req.user.userId, existing.date).catch(console.error);
+    await regenerateWeekSummary(req.user.userId, existing.date);
 
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
@@ -304,8 +302,7 @@ async function deleteEntry(req, res) {
 
     await prisma.dailyDiary.delete({ where: { id: existing.id } });
 
-    await invalidateWeekCache(req.user.userId, existing.date);
-    regenerateWeekSummary(req.user.userId, existing.date).catch(console.error);
+    await regenerateWeekSummary(req.user.userId, existing.date);
 
     res.json({ message: "Entry deleted." });
   } catch (err) {

@@ -10,31 +10,87 @@ function getWeekNumber(date) {
   return weekNum;
 }
 
+function getMonthWeekNumber(date) {
+  const d = new Date(date);
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth();
+  const firstDay = new Date(Date.UTC(year, month, 1));
+  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+
+  // Find first Sunday of the month
+  let firstSunday = new Date(firstDay);
+  if (firstDay.getUTCDay() !== 0) {
+    firstSunday.setUTCDate(firstDay.getUTCDate() + (7 - firstDay.getUTCDay()));
+  }
+
+  // If date is in week 1 (before or on first Sunday)
+  if (d <= firstSunday) {
+    return 1;
+  }
+
+  // Find last Monday of the month (matches getWeekRange formula)
+  let lastMonday = new Date(lastDay);
+  const lastDayOfWeek = lastDay.getUTCDay();
+  const daysBack = lastDayOfWeek === 0 ? 6 : lastDayOfWeek - 1;
+  lastMonday.setUTCDate(lastDay.getUTCDate() - daysBack);
+
+  // If date is in last week (from last Monday onwards)
+  if (d >= lastMonday) {
+    const totalDays = (lastMonday - firstSunday) / (1000 * 60 * 60 * 24);
+    return Math.floor(totalDays / 7) + 2;
+  }
+
+  // Middle weeks: count from first Sunday
+  const daysSinceFirstSunday = (d - firstSunday) / (1000 * 60 * 60 * 24);
+  return Math.floor(daysSinceFirstSunday / 7) + 2;
+}
+
 function getWeekRange(year, month, weekNumber) {
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  
-  const startOfWeek1 = getWeekStart(firstDay);
-  
-  const weekStart = new Date(startOfWeek1);
-  weekStart.setDate(startOfWeek1.getDate() + (weekNumber - 1) * 7);
-  
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-  
-  if (weekStart.getMonth() !== month && weekEnd.getMonth() !== month) {
-    return null;
+  const firstDay = new Date(Date.UTC(year, month, 1));
+  const lastDay = new Date(Date.UTC(year, month + 1, 0));
+
+  let weekStart, weekEnd;
+
+  if (weekNumber === 1) {
+    // Week 1: 1st of month to first Sunday
+    weekStart = new Date(firstDay);
+    if (firstDay.getUTCDay() === 0) {
+      weekEnd = new Date(firstDay);
+    } else {
+      weekEnd = new Date(firstDay);
+      weekEnd.setUTCDate(firstDay.getUTCDate() + (7 - firstDay.getUTCDay()));
+    }
+  } else {
+    // Find first Sunday
+    let firstSunday = new Date(firstDay);
+    if (firstDay.getUTCDay() !== 0) {
+      firstSunday.setUTCDate(firstDay.getUTCDate() + (7 - firstDay.getUTCDay()));
+    }
+
+    // Find last Monday
+    let lastMonday = new Date(lastDay);
+    const lastDayOfWeek = lastDay.getUTCDay();
+    const daysBack = lastDayOfWeek === 0 ? 6 : lastDayOfWeek - 1;
+    lastMonday.setUTCDate(lastDay.getUTCDate() - daysBack);
+
+    // Check if this is the last week
+    const daysBetween = (lastMonday - firstSunday) / (1000 * 60 * 60 * 24);
+    const maxWeeks = Math.floor(daysBetween / 7) + 2;
+
+    if (weekNumber === maxWeeks) {
+      // Last week: last Monday to month end
+      weekStart = new Date(lastMonday);
+      weekEnd = new Date(lastDay);
+    } else {
+      // Middle weeks: Monday to Sunday
+      const weekOffset = weekNumber - 2;
+      weekStart = new Date(firstSunday);
+      weekStart.setUTCDate(firstSunday.getUTCDate() + 1 + (weekOffset * 7));
+      weekEnd = new Date(weekStart);
+      weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+    }
   }
-  
-  if (weekStart.getMonth() !== month) {
-    weekStart.setMonth(month);
-    weekStart.setDate(1);
-  }
-  
-  if (weekEnd.getMonth() !== month && weekEnd > lastDay) {
-    weekEnd = lastDay;
-  }
-  
+
   return {
     weekStart: weekStart.toISOString(),
     weekEnd: weekEnd.toISOString(),
@@ -97,13 +153,28 @@ Respond in this exact JSON format (no markdown, just clean JSON):
 }
     `.trim();
 
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
-        temperature: 0.3
+    let retries = 3;
+    let response;
+    while (retries > 0) {
+      try {
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            temperature: 0.3
+          }
+        });
+        break;
+      } catch (apiError) {
+        if (apiError.status === 503 && retries > 1) {
+          console.log(`AI API retrying, ${retries} attempts left...`);
+          retries--;
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } else {
+          throw apiError;
+        }
       }
-    });
+    }
 
     let result = response.text.trim();
     
@@ -259,22 +330,35 @@ async function getWeeklyEntries(req, res) {
     const monthStart = new Date(yearNum, monthNum, 1);
     const monthEnd = new Date(yearNum, monthNum + 1, 0);
     
-    let currentWeekStart = getWeekStart(monthStart);
+    const firstDay = monthStart;
+    let firstSunday = new Date(firstDay);
+    if (firstDay.getDay() !== 0) {
+      firstSunday.setDate(firstDay.getDate() + (7 - firstDay.getDay()));
+    }
+    
+    let lastMonday = new Date(monthEnd);
+    if (monthEnd.getDay() !== 0) {
+      lastMonday.setDate(monthEnd.getDate() - monthEnd.getDay());
+    }
+    
+    const daysBetween = (lastMonday - firstSunday) / (1000 * 60 * 60 * 24);
+    const totalWeeks = Math.floor(daysBetween / 7) + 2;
+    
     const weeks = [];
     
-    let weekNumber = 1;
-    while (currentWeekStart <= monthEnd) {
-      const weekEnd = new Date(currentWeekStart);
-      weekEnd.setDate(currentWeekStart.getDate() + 6);
+    for (let weekNumber = 1; weekNumber <= totalWeeks; weekNumber++) {
+      const range = getWeekRange(yearNum, monthNum, weekNumber);
+      if (!range) continue;
       
-      const weekEndClamped = weekEnd > monthEnd ? monthEnd : weekEnd;
+      const weekStartDate = new Date(range.weekStart);
+      const weekEndDate = new Date(range.weekEnd);
       
       const weekEntries = entries.filter(e => {
         const entryDate = new Date(e.date);
-        return entryDate >= currentWeekStart && entryDate <= weekEndClamped;
+        return entryDate >= weekStartDate && entryDate <= weekEndDate;
       });
 
-      if (weekEntries.length > 0 || currentWeekStart.getMonth() === monthNum) {
+      if (weekEntries.length > 0 || weekStartDate.getMonth() === monthNum) {
         const summary = await generateWeekSummary(
           userId,
           yearNum,
@@ -298,9 +382,6 @@ async function getWeeklyEntries(req, res) {
           });
         }
       }
-      
-      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-      weekNumber++;
     }
 
     res.json({ weeks });
@@ -315,7 +396,7 @@ async function invalidateWeekCache(userId, entryDate) {
     const date = new Date(entryDate);
     const year = date.getFullYear();
     const month = date.getMonth();
-    const weekNumber = getWeekNumber(date);
+    const weekNumber = getMonthWeekNumber(date);
 
     await prisma.weeklySummary.deleteMany({
       where: {
@@ -337,26 +418,20 @@ async function regenerateWeekSummary(userId, entryDate) {
     const date = new Date(entryDate);
     const year = date.getFullYear();
     const month = date.getMonth();
-    const weekNumber = getWeekNumber(date);
+    const weekNumber = getMonthWeekNumber(date);
 
-    const monthStart = new Date(year, month, 1);
-    const monthEnd = new Date(year, month + 1, 0);
-    
-    const startOfWeek1 = getWeekStart(monthStart);
-    const weekStartDate = new Date(startOfWeek1);
-    weekStartDate.setDate(startOfWeek1.getDate() + (weekNumber - 1) * 7);
-    
-    const weekEndDate = new Date(weekStartDate);
-    weekEndDate.setDate(weekStartDate.getDate() + 6);
-    
-    const weekEndClamped = weekEndDate > monthEnd ? monthEnd : weekEndDate;
+    const range = getWeekRange(year, month, weekNumber);
+    if (!range) return;
+
+    const weekStartDate = new Date(range.weekStart);
+    const weekEndDate = new Date(range.weekEnd);
 
     const allEntries = await prisma.dailyDiary.findMany({
       where: {
         userId,
         date: {
           gte: weekStartDate,
-          lte: weekEndClamped
+          lte: weekEndDate
         }
       },
       include: {

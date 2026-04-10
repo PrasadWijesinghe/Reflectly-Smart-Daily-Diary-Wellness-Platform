@@ -56,6 +56,9 @@ const monthShort = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
+const weekDayShort = [
+  "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
+];
 
 function getOrdinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -685,7 +688,7 @@ export default function ViewAllDiaryScreen() {
                     <View style={styles.weekHeader}>
                       <View>
                         <Text style={styles.weekLabel}>
-                          {getOrdinal(weekStartDate.getDate())} - {getOrdinal(weekEndDate.getDate())} {monthShort[weekEndDate.getMonth()]}
+                          {getOrdinal(weekStartDate.getUTCDate())} {weekDayShort[weekStartDate.getUTCDay()]} - {getOrdinal(weekEndDate.getUTCDate())} {weekDayShort[weekEndDate.getUTCDay()]}
                         </Text>
                         {week.mood && (
                           <Text style={styles.weekMood}>{week.mood}</Text>
