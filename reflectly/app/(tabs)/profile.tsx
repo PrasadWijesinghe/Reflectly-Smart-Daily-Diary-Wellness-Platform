@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
+  TextInput,
   Text,
   TouchableOpacity,
   View,
@@ -28,6 +30,8 @@ type ProfileUser = {
   name: string;
   email: string;
   createdAt: string;
+  appLockEnabled?: boolean;
+  appLockType?: "pin" | "password" | null;
 };
 
 type DiaryEntry = {
@@ -49,23 +53,6 @@ const DIARY_PREFS: SettingRow[] = [
     label: "Daily Reminders",
     value: "On",
     valueColor: "#10B981",
-  },
-];
-
-const PRIVACY: SettingRow[] = [
-  {
-    icon: "lock-closed",
-    iconColor: "#F59E0B",
-    label: "Privacy Settings",
-    value: "Private",
-    valueColor: "#3B82F6",
-  },
-  {
-    icon: "shield-checkmark",
-    iconColor: "#3B82F6",
-    label: "Data Security",
-    value: "Encrypted",
-    valueColor: "#3B82F6",
   },
 ];
 
@@ -123,13 +110,16 @@ function calculateThisWeek(entries: DiaryEntry[]) {
   return entries.filter((entry) => new Date(entry.date) >= weekStart).length;
 }
 
-function SettingItem({ item }: { item: SettingRow }) {
+function SettingItem({ item, onPress }: { item: SettingRow; onPress?: () => void }) {
   const router = useRouter();
 
   const handlePress = () => {
     if (item.label === "Send Feedback") {
       router.push("/feedback");
+      return;
     }
+
+    onPress?.();
   };
 
   return (
@@ -161,12 +151,18 @@ function SettingItem({ item }: { item: SettingRow }) {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { logout, token, user } = useAuth();
+  const { logout, token, user, setupAppLock, disableAppLock } = useAuth();
   const [profile, setProfile] = useState<ProfileUser | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLockModalVisible, setIsLockModalVisible] = useState(false);
+  const [lockType, setLockType] = useState<"pin" | "password">("pin");
+  const [lockValue, setLockValue] = useState("");
+  const [lockConfirmValue, setLockConfirmValue] = useState("");
+  const [lockError, setLockError] = useState<string | null>(null);
+  const [isSavingLock, setIsSavingLock] = useState(false);
 
   async function loadProfileData(showRefresh = false) {
     if (!token) {
@@ -217,9 +213,104 @@ export default function ProfileScreen() {
     loadProfileData();
   }, [token]);
 
+  const privacyItems = useMemo<SettingRow[]>(
+    () => [
+      {
+        icon: "lock-closed",
+        iconColor: "#F59E0B",
+        label: "App Lock",
+        value: profile?.appLockEnabled
+          ? profile?.appLockType === "pin"
+            ? "PIN Enabled"
+            : "Password Enabled"
+          : "Off",
+        valueColor: profile?.appLockEnabled ? "#10B981" : "#9CA3AF",
+      },
+      {
+        icon: "shield-checkmark",
+        iconColor: "#3B82F6",
+        label: "Data Security",
+        value: "Encrypted",
+        valueColor: "#3B82F6",
+      },
+    ],
+    [profile?.appLockEnabled, profile?.appLockType]
+  );
+
   async function handleLogout() {
     await logout();
     router.replace("/(auth)/login");
+  }
+
+  async function handleSaveLock() {
+    const normalizedValue = lockType === "pin" ? lockValue.trim() : lockValue;
+    const normalizedConfirm = lockType === "pin" ? lockConfirmValue.trim() : lockConfirmValue;
+
+    if (!normalizedValue || !normalizedConfirm) {
+      setLockError("Please complete both fields.");
+      return;
+    }
+
+    if (normalizedValue !== normalizedConfirm) {
+      setLockError("The values do not match.");
+      return;
+    }
+
+    if (lockType === "pin" && !/^\d{4}$/.test(normalizedValue)) {
+      setLockError("PIN must be exactly 4 digits.");
+      return;
+    }
+
+    if (lockType === "password" && normalizedValue.length < 6) {
+      setLockError("App password must be at least 6 characters.");
+      return;
+    }
+
+    try {
+      setIsSavingLock(true);
+      setLockError(null);
+      await setupAppLock(lockType, normalizedValue);
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              appLockEnabled: true,
+              appLockType: lockType,
+            }
+          : current
+      );
+      setIsLockModalVisible(false);
+      setLockValue("");
+      setLockConfirmValue("");
+    } catch (err) {
+      setLockError(err instanceof Error ? err.message : "Failed to save app lock.");
+    } finally {
+      setIsSavingLock(false);
+    }
+  }
+
+  async function handleDisableLock() {
+    try {
+      setIsSavingLock(true);
+      setLockError(null);
+      await disableAppLock();
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              appLockEnabled: false,
+              appLockType: null,
+            }
+          : current
+      );
+      setIsLockModalVisible(false);
+      setLockValue("");
+      setLockConfirmValue("");
+    } catch (err) {
+      setLockError(err instanceof Error ? err.message : "Failed to disable app lock.");
+    } finally {
+      setIsSavingLock(false);
+    }
   }
 
   const stats = useMemo(
@@ -321,10 +412,13 @@ export default function ProfileScreen() {
 
         <Text style={styles.sectionLabel}>PRIVACY & SECURITY</Text>
         <View style={styles.sectionCard}>
-          {PRIVACY.map((item, i) => (
+          {privacyItems.map((item, i) => (
             <View key={i}>
-              <SettingItem item={item} />
-              {i < PRIVACY.length - 1 && <View style={styles.divider} />}
+              <SettingItem
+                item={item}
+                onPress={item.label === "App Lock" ? () => setIsLockModalVisible(true) : undefined}
+              />
+              {i < privacyItems.length - 1 && <View style={styles.divider} />}
             </View>
           ))}
         </View>
@@ -348,6 +442,104 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={isLockModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsLockModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>App Lock</Text>
+              <TouchableOpacity onPress={() => setIsLockModalVisible(false)} activeOpacity={0.7}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Set a unique {lockType === "pin" ? "PIN" : "password"} for this user account.
+            </Text>
+
+            <View style={styles.toggleRow}>
+              {(["pin", "password"] as const).map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.toggleButton, lockType === type && styles.toggleButtonActive]}
+                  onPress={() => {
+                    setLockType(type);
+                    setLockValue("");
+                    setLockConfirmValue("");
+                    setLockError(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[styles.toggleLabel, lockType === type && styles.toggleLabelActive]}
+                  >
+                    {type === "pin" ? "PIN" : "Password"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              value={lockValue}
+              onChangeText={(value) => {
+                setLockValue(value);
+                if (lockError) setLockError(null);
+              }}
+              placeholder={lockType === "pin" ? "Enter 4-digit PIN" : "Create app password"}
+              placeholderTextColor="#94A3B8"
+              secureTextEntry
+              keyboardType={lockType === "pin" ? "number-pad" : "default"}
+              maxLength={lockType === "pin" ? 4 : 32}
+              style={styles.modalInput}
+            />
+
+            <TextInput
+              value={lockConfirmValue}
+              onChangeText={(value) => {
+                setLockConfirmValue(value);
+                if (lockError) setLockError(null);
+              }}
+              placeholder={lockType === "pin" ? "Confirm PIN" : "Confirm app password"}
+              placeholderTextColor="#94A3B8"
+              secureTextEntry
+              keyboardType={lockType === "pin" ? "number-pad" : "default"}
+              maxLength={lockType === "pin" ? 4 : 32}
+              style={styles.modalInput}
+            />
+
+            {lockError ? <Text style={styles.lockErrorText}>{lockError}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.primaryButton, isSavingLock && styles.disabledAction]}
+              onPress={handleSaveLock}
+              disabled={isSavingLock}
+              activeOpacity={0.85}
+            >
+              {isSavingLock ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Save App Lock</Text>
+              )}
+            </TouchableOpacity>
+
+            {profile?.appLockEnabled ? (
+              <TouchableOpacity
+                style={[styles.secondaryButton, isSavingLock && styles.disabledAction]}
+                onPress={handleDisableLock}
+                disabled={isSavingLock}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.secondaryButtonText}>Turn Off App Lock</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -550,5 +742,103 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#EF4444",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.4)",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  modalSubtitle: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+  },
+  toggleRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 18,
+  },
+  toggleButton: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FAFC",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  toggleButtonActive: {
+    borderColor: "#2563EB",
+    backgroundColor: "#DBEAFE",
+  },
+  toggleLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  toggleLabelActive: {
+    color: "#1D4ED8",
+  },
+  modalInput: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 16,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: "#0F172A",
+  },
+  lockErrorText: {
+    marginTop: 10,
+    fontSize: 13,
+    color: "#DC2626",
+  },
+  primaryButton: {
+    marginTop: 18,
+    backgroundColor: "#2563EB",
+    borderRadius: 16,
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  secondaryButton: {
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  secondaryButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#DC2626",
+  },
+  disabledAction: {
+    opacity: 0.7,
   },
 });
