@@ -1,22 +1,25 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { View } from "react-native";
+import { useTheme } from "../../context/ThemeContext";
 import FloatingChatButton from "../../components/FloatingChatButton";
 import FloatingReminderButton from "../../components/FloatingReminderButton";
 
 export default function TabLayout() {
+  const { theme } = useTheme();
+
   return (
     <View style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: "#3B82F6",
+          tabBarActiveTintColor: theme.primary,
           tabBarInactiveTintColor: "#9CA3AF",
           headerShown: false,
           tabBarShowLabel: true,
           tabBarStyle: {
-            backgroundColor: "#FFFFFF",
+            backgroundColor: theme.surface,
             borderTopWidth: 1,
-            borderTopColor: "#F3F4F6",
+            borderTopColor: theme.primarySoft,
             height: 70,
             paddingBottom: 10,
             paddingTop: 8,

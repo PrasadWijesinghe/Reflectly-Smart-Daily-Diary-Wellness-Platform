@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, DeviceEventEmitter, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { getApiUrl } from "../../utils/api";
+import NotificationCenter from "../../components/NotificationCenter";
+import {
+  applyReadState,
+  buildHomeNotifications,
+  DIARY_UPDATED_EVENT,
+  loadNotificationReadIds,
+  loadScopedJsonList,
+  OPEN_REMINDERS_EVENT,
+  REMINDERS_UPDATED_EVENT as NOTIFICATION_REMINDERS_UPDATED_EVENT,
+  ReminderItem,
+  saveNotificationReadIds,
+} from "../../utils/notifications";
 
 type MoodTrendDay = {
   date: string;
@@ -26,6 +38,7 @@ type Reminder = {
 const STRESS_LEVEL = 65;
 const REMINDER_STORAGE_KEY = "reflectly_reminders";
 const REMINDERS_UPDATED_EVENT = "reflectly:reminders-updated";
+const RANDOM_FACE_EMOJIS = ["😀", "😄", "🙂", "😊", "😌", "🤩", "🥳", "😎", "😁", "😇"];
 const SUGGESTIONS = [
   { icon: "game-controller-outline" as const, title: "Play a quick game", subtitle: "Reduce stress with fun mini-games", color: "#3B82F6" },
   { icon: "time-outline" as const, title: "Take a 5-min break", subtitle: "Short breaks boost productivity", color: "#F59E0B" },
@@ -43,13 +56,24 @@ function getHomeMoodEmoji(day: MoodTrendDay) {
   return "🙂";
 }
 
+function getRandomWeekFaces(total: number) {
+  return Array.from({ length: total }, () => {
+    const index = Math.floor(Math.random() * RANDOM_FACE_EMOJIS.length);
+    return RANDOM_FACE_EMOJIS[index];
+  });
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
+  const { theme } = useTheme();
   const firstName = user?.name?.split(" ")[0] || "there";
   const [weekMoods, setWeekMoods] = useState<MoodTrendDay[]>([]);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [weekFaces, setWeekFaces] = useState<string[]>([]);
+  const [reminders, setReminders] = useState<ReminderItem[]>([]);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const [isLoadingWeekMoods, setIsLoadingWeekMoods] = useState(true);
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -62,6 +86,7 @@ export default function HomeScreen() {
     async function loadWeekMoods() {
       if (!token) {
         setWeekMoods([]);
+        setWeekFaces([]);
         setIsLoadingWeekMoods(false);
         return;
       }
@@ -72,23 +97,31 @@ export default function HomeScreen() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load mood trend.");
-        setWeekMoods(Array.isArray(data.days) ? data.days : []);
+        const nextWeekMoods = Array.isArray(data.days) ? data.days : [];
+        setWeekMoods(nextWeekMoods);
+        setWeekFaces(getRandomWeekFaces(nextWeekMoods.length));
       } catch (error) {
         console.error("Failed to load weekly vibe:", error);
         setWeekMoods([]);
+        setWeekFaces([]);
       } finally {
         setIsLoadingWeekMoods(false);
       }
     }
 
     loadWeekMoods();
+    const diarySubscription = DeviceEventEmitter.addListener(DIARY_UPDATED_EVENT, loadWeekMoods);
+    return () => diarySubscription.remove();
   }, [token]);
 
   useEffect(() => {
     async function loadReminders() {
       try {
-        const stored = await AsyncStorage.getItem(REMINDER_STORAGE_KEY);
-        const parsed = stored ? JSON.parse(stored) : [];
+        const parsed = await loadScopedJsonList<ReminderItem>(
+          "reflectly_reminders",
+          user?.id,
+          "reflectly_reminders",
+        );
         setReminders(Array.isArray(parsed) ? parsed : []);
       } catch (error) {
         console.error("Failed to load reminders for home:", error);
@@ -96,27 +129,94 @@ export default function HomeScreen() {
       }
     }
 
-    loadReminders();
+    async function loadReadIds() {
+      const readIds = await loadNotificationReadIds(user?.id);
+      setReadNotificationIds(readIds);
+    }
 
-    const subscription = DeviceEventEmitter.addListener(REMINDERS_UPDATED_EVENT, loadReminders);
-    return () => subscription.remove();
-  }, []);
+    loadReminders();
+    loadReadIds();
+
+    const reminderSubscription = DeviceEventEmitter.addListener(
+      NOTIFICATION_REMINDERS_UPDATED_EVENT,
+      loadReminders,
+    );
+    return () => reminderSubscription.remove();
+  }, [user?.id]);
 
   const vibeLabel = weekMoods.some((day) => day.filled) ? "Live" : "No data";
+  const notifications = applyReadState(
+    buildHomeNotifications({
+      weekMoods,
+      reminders,
+    }),
+    readNotificationIds,
+  );
+  const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
+
+  async function persistReadNotificationIds(nextIds: string[]) {
+    setReadNotificationIds(nextIds);
+    if (user?.id) {
+      await saveNotificationReadIds(user.id, nextIds);
+    }
+  }
+
+  async function handlePressNotification(notificationId: string) {
+    const nextIds = readNotificationIds.includes(notificationId)
+      ? readNotificationIds
+      : [...readNotificationIds, notificationId];
+    await persistReadNotificationIds(nextIds);
+  }
+
+  async function handleNotificationAction(notification: (typeof notifications)[number]) {
+    await handlePressNotification(notification.id);
+    setIsNotificationCenterOpen(false);
+
+    if (notification.action === "open-diary") {
+      router.push("/(tabs)/diary");
+      return;
+    }
+
+    if (notification.action === "open-reminders") {
+      DeviceEventEmitter.emit(OPEN_REMINDERS_EVENT);
+      return;
+    }
+
+    if (notification.action === "open-breathing") {
+      router.push("/games/calm-breathing");
+    }
+  }
+
+  async function handleMarkAllRead() {
+    await persistReadNotificationIds(notifications.map((notification) => notification.id));
+  }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View style={{ flex: 1, backgroundColor: theme.surface }}>
       <StatusBar barStyle="light-content" />
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-        <View style={{ backgroundColor: "#3B82F6", paddingTop: 56, paddingBottom: 24, paddingHorizontal: 20 }}>
+      <ScrollView style={{ flex: 1, backgroundColor: theme.surface }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+        <View style={{ backgroundColor: theme.primary, paddingTop: 56, paddingBottom: 24, paddingHorizontal: 20 }}>
           <View className="flex-row items-center justify-between">
             <View>
               <Text className="text-white/80 text-sm">{getGreeting()} 🌤️</Text>
               <Text className="text-white text-2xl font-bold mt-1">Hi, {firstName}! 👋</Text>
               <Text className="text-white/70 text-sm mt-1">How are you feeling today?</Text>
             </View>
-            <TouchableOpacity className="bg-white/20 rounded-full p-2">
-              <Ionicons name="happy-outline" size={28} color="white" />
+            <TouchableOpacity
+              className="bg-white/20 rounded-full p-2"
+              activeOpacity={0.8}
+              onPress={() => setIsNotificationCenterOpen(true)}
+            >
+              <View style={{ position: "relative" }}>
+                <Ionicons name="notifications-outline" size={28} color="white" />
+                {unreadNotificationCount > 0 ? (
+                  <View style={{ position: "absolute", top: -3, right: -4, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: theme.badge, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 }}>
+                    <Text style={{ color: "#FFFFFF", fontSize: 10, fontWeight: "800" }}>
+                      {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -137,13 +237,13 @@ export default function HomeScreen() {
               </View>
             ) : (
               <View className="flex-row justify-between">
-                {weekMoods.map((day) => {
+                {weekMoods.map((day, index) => {
                   const reminderForDay = reminders.find((reminder) => reminder.date === day.date);
-                  const displayEmoji = getHomeMoodEmoji(day);
+                  const displayEmoji = weekFaces[index] || "🙂";
 
                   return (
                     <View key={day.date} className="items-center" style={{ width: 42 }}>
-                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: day.filled ? day.color : "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
                         {displayEmoji && <Text style={{ fontSize: 14 }}>{displayEmoji}</Text>}
                       </View>
                       <Text className="text-white/70 text-xs mt-1">{day.day}</Text>
@@ -165,17 +265,17 @@ export default function HomeScreen() {
         </View>
 
         <View className="px-5 -mt-0 pt-5">
-          <View className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+          <View style={{ backgroundColor: "#FFFFFF", borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2 }}>
             <View className="flex-row items-center justify-between mb-1">
               <View className="flex-row items-center">
                 <Text className="text-base font-bold text-gray-800">Stress Check</Text>
                 <Text className="ml-1.5">😊</Text>
               </View>
-              <TouchableOpacity className="bg-blue-50 rounded-full p-2">
-                <Ionicons name="heart-outline" size={20} color="#3B82F6" />
+              <TouchableOpacity style={{ backgroundColor: theme.surfaceTint, borderRadius: 999, padding: 8 }}>
+                <Ionicons name="heart-outline" size={20} color={theme.primary} />
               </TouchableOpacity>
             </View>
-            <Text className="text-gray-400 text-xs mb-4">Let&apos;s keep an eye on this!</Text>
+            <Text style={{ color: "#6B7280", fontSize: 12, marginBottom: 16 }}>Let&apos;s keep an eye on this!</Text>
 
             <View className="flex-row items-center justify-between mb-1">
               <Text className="text-xs text-gray-500">Chill 😎</Text>
@@ -244,6 +344,14 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+      <NotificationCenter
+        visible={isNotificationCenterOpen}
+        notifications={notifications}
+        unreadCount={unreadNotificationCount}
+        onClose={() => setIsNotificationCenterOpen(false)}
+        onPressNotification={handleNotificationAction}
+        onMarkAllRead={handleMarkAllRead}
+      />
     </View>
   );
 }

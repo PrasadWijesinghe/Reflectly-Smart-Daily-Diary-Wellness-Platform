@@ -12,9 +12,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 export default function AppLockGate() {
   const { user, isLoading, isAppUnlocked, verifyAppLock, logout } = useAuth();
+  const { theme } = useTheme();
   const [secret, setSecret] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,17 +42,17 @@ export default function AppLockGate() {
 
   return (
     <View style={styles.overlay}>
-      <LinearGradient colors={["#0F172A", "#1E3A8A", "#2563EB"]} style={styles.gradient}>
+      <LinearGradient colors={theme.gradient} style={styles.gradient}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.cardWrap}
         >
           <View style={styles.card}>
-            <View style={styles.iconWrap}>
+            <View style={[styles.iconWrap, { backgroundColor: theme.primarySoft }]}>
               <Ionicons
                 name={lockType === "pin" ? "keypad-outline" : "lock-closed-outline"}
                 size={30}
-                color="#2563EB"
+                color={theme.primary}
               />
             </View>
             <Text style={styles.title}>App Lock</Text>
@@ -75,7 +77,7 @@ export default function AppLockGate() {
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <TouchableOpacity
-              style={[styles.unlockButton, isSubmitting && styles.disabledButton]}
+              style={[styles.unlockButton, { backgroundColor: theme.primary }, isSubmitting && styles.disabledButton]}
               onPress={handleUnlock}
               disabled={isSubmitting}
               activeOpacity={0.85}

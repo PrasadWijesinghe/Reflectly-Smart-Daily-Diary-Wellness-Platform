@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useTheme } from "../../context/ThemeContext";
 
 type GameRoute = "/games/calm-breathing" | "/games/memory-match" | "/games/game-2048";
 
@@ -73,6 +74,7 @@ const BENEFITS = [
 
 export default function GamesScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
 
   function handleBack() {
     if (router.canGoBack()) {
@@ -84,9 +86,9 @@ export default function GamesScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.surface }]}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={["#3B82F6", "#2563EB", "#1D4ED8"]} style={styles.header}>
+      <LinearGradient colors={theme.gradient} style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={handleBack} style={styles.headerBackButton}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
@@ -109,7 +111,7 @@ export default function GamesScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         <LinearGradient
-          colors={["#3B82F6", "#6366F1", "#7C3AED"]}
+          colors={theme.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.banner}
@@ -124,7 +126,7 @@ export default function GamesScreen() {
         </LinearGradient>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionBadge}>Play</Text>
+          <Text style={[styles.sectionBadge, { color: theme.primaryDark, backgroundColor: theme.primarySoft }]}>Play</Text>
           <Text style={styles.sectionTitle}>Choose Your Reset</Text>
         </View>
 
@@ -136,7 +138,7 @@ export default function GamesScreen() {
               activeOpacity={0.85}
               onPress={() => router.push(game.route)}
             >
-              <View style={[styles.gameIconWrap, { backgroundColor: game.iconBg }]}>
+                <View style={[styles.gameIconWrap, { backgroundColor: game.iconBg }]}>
                 <Ionicons name={game.icon} size={22} color="#FFFFFF" />
               </View>
               <Text style={styles.gameTitle}>{game.title}</Text>
@@ -155,13 +157,13 @@ export default function GamesScreen() {
         </View>
 
         <View style={styles.whyPlayCard}>
-          <View style={styles.whyPlayHeader}>
-            <Ionicons name="heart" size={16} color="#8B5CF6" />
+            <View style={styles.whyPlayHeader}>
+            <Ionicons name="heart" size={16} color={theme.primary} />
             <Text style={styles.whyPlayTitle}>Why this works</Text>
           </View>
           {BENEFITS.map((benefit, index) => (
             <View key={index} style={styles.benefitRow}>
-              <Ionicons name={benefit.icon} size={18} color="#3B82F6" />
+              <Ionicons name={benefit.icon} size={18} color={theme.primary} />
               <Text style={styles.benefitText}>{benefit.text}</Text>
             </View>
           ))}
