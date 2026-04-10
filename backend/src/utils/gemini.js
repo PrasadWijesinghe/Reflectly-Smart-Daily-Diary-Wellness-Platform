@@ -15,12 +15,15 @@ function fallbackSummary(content) {
 async function generateAISummary(content) {
   if (!content || !content.trim()) return "";
 
+  console.log(`[Gemini] Starting AI summary generation, content length: ${content.length}`);
+
   if (!GEMINI_API_KEY) {
-    console.warn("GEMINI_API_KEY not set, using fallback summary.");
+    console.warn("[Gemini] GEMINI_API_KEY not set, using fallback summary.");
     return fallbackSummary(content);
   }
 
   try {
+    console.log(`[Gemini] Calling API with model: ${GEMINI_MODEL}`);
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
       {
@@ -45,23 +48,27 @@ async function generateAISummary(content) {
     );
 
     if (!response.ok) {
-      console.error("Gemini API error:", response.status);
+      console.error(`[Gemini] API error: ${response.status}`);
       return fallbackSummary(content);
     }
 
     const data = await response.json();
+    console.log(`[Gemini] API response received, parsing summary...`);
+
     const summary = data?.candidates?.[0]?.content?.parts
       ?.map((part) => part?.text || "")
       .join("")
       .trim();
 
     if (!summary) {
+      console.warn("[Gemini] No summary in API response, using fallback.");
       return fallbackSummary(content);
     }
 
+    console.log(`[Gemini] Success! Summary: "${summary}"`);
     return summary;
   } catch (error) {
-    console.error("generateAISummary error:", error.message);
+    console.error(`[Gemini] Exception: ${error.message}`);
     return fallbackSummary(content);
   }
 }

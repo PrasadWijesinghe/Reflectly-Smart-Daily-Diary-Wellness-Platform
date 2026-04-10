@@ -1,4 +1,6 @@
 const prisma = require("../utils/prisma");
+const { generateAISummary } = require("../utils/gemini");
+const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
 
 function generateSummary(content) {
   const trimmed = content.trim();
@@ -184,7 +186,9 @@ async function createEntry(req, res) {
     }
 
     const normalizedDate = normalizeDate(date);
-    const summary = generateSummary(content);
+    console.log(`[AI Summary] Generating summary for user ${req.user.userId}, date ${normalizedDate}`);
+    const summary = await generateAISummary(content);
+    console.log(`[AI Summary] Generated: "${summary}"`);
     const tagConnect =
       tagIds && tagIds.length > 0
         ? { connect: tagIds.map((id) => ({ id })) }
@@ -213,6 +217,8 @@ async function createEntry(req, res) {
       },
       include: { tags: true },
     });
+
+    await regenerateWeekSummary(req.user.userId, normalizedDate);
 
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {
@@ -259,7 +265,9 @@ async function updateEntry(req, res) {
     const updateData = {};
     if (content !== undefined) {
       updateData.content = content;
-      updateData.summary = generateSummary(content);
+      console.log(`[AI Summary] Generating summary for entry ${existing.id}, user ${req.user.userId}`);
+      updateData.summary = await generateAISummary(content);
+      console.log(`[AI Summary] Generated: "${updateData.summary}"`);
     }
     if (tagIds !== undefined) {
       updateData.tags = {
@@ -272,6 +280,8 @@ async function updateEntry(req, res) {
       data: updateData,
       include: { tags: true },
     });
+
+    await regenerateWeekSummary(req.user.userId, existing.date);
 
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
@@ -291,6 +301,8 @@ async function deleteEntry(req, res) {
     }
 
     await prisma.dailyDiary.delete({ where: { id: existing.id } });
+
+    await regenerateWeekSummary(req.user.userId, existing.date);
 
     res.json({ message: "Entry deleted." });
   } catch (err) {
