@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getApiUrl } from "../utils/api";
-import DeleteConfirmModal from "./DeleteConfirmModal";
+import ConfirmModal from "./ConfirmModal";
 
 type Tag = {
   id: number;
@@ -95,8 +95,9 @@ export default function DiaryCard({ entry, token, onEdit, onDelete }: Props) {
         )}
       </View>
 
-      <DeleteConfirmModal
+      <ConfirmModal
         visible={showDeleteModal}
+        type="delete"
         onConfirm={handleConfirmDelete}
         onCancel={() => setShowDeleteModal(false)}
       />

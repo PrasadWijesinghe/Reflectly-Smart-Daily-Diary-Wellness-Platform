@@ -60,7 +60,6 @@ export default function DiaryScreen() {
   const router = useRouter();
   const today = toDateString(new Date());
 
-  const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
   const [selectedDate, setSelectedDate] = useState(today);
   const [currentEntry, setCurrentEntry] = useState<DiaryEntry | null>(null);
   const [loadingEntry, setLoadingEntry] = useState(true);
@@ -203,54 +202,6 @@ export default function DiaryScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* Daily / Weekly Toggle */}
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              activeTab === "daily" && styles.toggleButtonActive,
-            ]}
-            onPress={() => setActiveTab("daily")}
-          >
-            <Ionicons
-              name="today"
-              size={16}
-              color={activeTab === "daily" ? "#FFFFFF" : "#6B7280"}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={[
-                styles.toggleText,
-                activeTab === "daily" && styles.toggleTextActive,
-              ]}
-            >
-              Daily
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.toggleButton,
-              activeTab === "weekly" && styles.toggleButtonActive,
-            ]}
-            onPress={() => setActiveTab("weekly")}
-          >
-            <Ionicons
-              name="calendar"
-              size={16}
-              color={activeTab === "weekly" ? "#FFFFFF" : "#6B7280"}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={[
-                styles.toggleText,
-                activeTab === "weekly" && styles.toggleTextActive,
-              ]}
-            >
-              Weekly
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Selected Date */}
         <View style={styles.dateCard}>
           <View>
@@ -403,32 +354,6 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     paddingHorizontal: 16,
-  },
-  toggleContainer: {
-    flexDirection: "row",
-    backgroundColor: "#E5E7EB",
-    borderRadius: 12,
-    padding: 4,
-    marginTop: 16,
-  },
-  toggleButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  toggleButtonActive: {
-    backgroundColor: "#3B82F6",
-  },
-  toggleText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6B7280",
-  },
-  toggleTextActive: {
-    color: "#FFFFFF",
   },
   dateCard: {
     backgroundColor: "#FFFFFF",
