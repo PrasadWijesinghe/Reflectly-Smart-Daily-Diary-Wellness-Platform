@@ -44,6 +44,28 @@ function getMoodColor(entry) {
   return "#60A5FA";
 }
 
+function getMoodEmoji(entry) {
+  const content = `${entry.content || ""} ${entry.summary || ""}`.toLowerCase();
+
+  if (content.includes("happy") || content.includes("great") || content.includes("hopeful")) {
+    return "😄";
+  }
+  if (content.includes("anxious") || content.includes("stress")) {
+    return "😟";
+  }
+  if (content.includes("calm")) {
+    return "😌";
+  }
+  if (content.includes("tired")) {
+    return "😴";
+  }
+  if (entry.content) {
+    return "🙂";
+  }
+
+  return null;
+}
+
 async function getEntryDates(req, res) {
   try {
     const entries = await prisma.dailyDiary.findMany({
@@ -102,12 +124,14 @@ async function getMoodTrend(req, res) {
     today.setUTCHours(0, 0, 0, 0);
 
     const start = new Date(today);
-    start.setUTCDate(today.getUTCDate() - (days - 1));
 
     const entries = await prisma.dailyDiary.findMany({
       where: {
         userId: req.user.userId,
-        date: { gte: start },
+        date: {
+          gte: start,
+          lt: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + days)),
+        },
       },
       orderBy: { date: "asc" },
     });

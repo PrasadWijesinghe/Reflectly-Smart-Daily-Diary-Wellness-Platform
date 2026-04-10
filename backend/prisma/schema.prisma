@@ -63,4 +63,4 @@ model WeeklySummary {
 
   @@unique([userId, year, month, weekNumber])
   @@index([userId])
-}
+}

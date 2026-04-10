@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, DeviceEventEmitter, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
@@ -14,18 +15,40 @@ type MoodTrendDay = {
   color: string;
 };
 
+type Reminder = {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  createdAt: string;
+};
+
 const STRESS_LEVEL = 65;
+const REMINDER_STORAGE_KEY = "reflectly_reminders";
+const REMINDERS_UPDATED_EVENT = "reflectly:reminders-updated";
 const SUGGESTIONS = [
   { icon: "game-controller-outline" as const, title: "Play a quick game", subtitle: "Reduce stress with fun mini-games", color: "#3B82F6" },
   { icon: "time-outline" as const, title: "Take a 5-min break", subtitle: "Short breaks boost productivity", color: "#F59E0B" },
   { icon: "walk-outline" as const, title: "Go for a short walk", subtitle: "Fresh air clears your mind", color: "#8B5CF6" },
 ];
 
+function getHomeMoodEmoji(day: MoodTrendDay) {
+  if (day.emoji) return day.emoji;
+  if (!day.filled) return null;
+
+  if (day.color === "#FCD34D") return "😄";
+  if (day.color === "#F87171") return "😟";
+  if (day.color === "#34D399") return "😌";
+  if (day.color === "#9CA3AF") return "😴";
+  return "🙂";
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { user, token } = useAuth();
   const firstName = user?.name?.split(" ")[0] || "there";
   const [weekMoods, setWeekMoods] = useState<MoodTrendDay[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [isLoadingWeekMoods, setIsLoadingWeekMoods] = useState(true);
 
   const getGreeting = () => {
@@ -60,6 +83,24 @@ export default function HomeScreen() {
 
     loadWeekMoods();
   }, [token]);
+
+  useEffect(() => {
+    async function loadReminders() {
+      try {
+        const stored = await AsyncStorage.getItem(REMINDER_STORAGE_KEY);
+        const parsed = stored ? JSON.parse(stored) : [];
+        setReminders(Array.isArray(parsed) ? parsed : []);
+      } catch (error) {
+        console.error("Failed to load reminders for home:", error);
+        setReminders([]);
+      }
+    }
+
+    loadReminders();
+
+    const subscription = DeviceEventEmitter.addListener(REMINDERS_UPDATED_EVENT, loadReminders);
+    return () => subscription.remove();
+  }, []);
 
   const vibeLabel = weekMoods.some((day) => day.filled) ? "Live" : "No data";
 
@@ -96,14 +137,28 @@ export default function HomeScreen() {
               </View>
             ) : (
               <View className="flex-row justify-between">
-                {weekMoods.map((day) => (
-                  <View key={day.date} className="items-center">
-                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: day.filled ? day.color : "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
-                      {day.filled && <Text style={{ fontSize: 14 }}>{day.emoji}</Text>}
+                {weekMoods.map((day) => {
+                  const reminderForDay = reminders.find((reminder) => reminder.date === day.date);
+                  const displayEmoji = getHomeMoodEmoji(day);
+
+                  return (
+                    <View key={day.date} className="items-center" style={{ width: 42 }}>
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: day.filled ? day.color : "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
+                        {displayEmoji && <Text style={{ fontSize: 14 }}>{displayEmoji}</Text>}
+                      </View>
+                      <Text className="text-white/70 text-xs mt-1">{day.day}</Text>
+                      {reminderForDay ? (
+                        <View style={{ marginTop: 6, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 10, paddingHorizontal: 6, paddingVertical: 4, minHeight: 34, justifyContent: "center" }}>
+                          <Text numberOfLines={2} style={{ color: "#FFFFFF", fontSize: 9, textAlign: "center", fontWeight: "600", lineHeight: 11 }}>
+                            {reminderForDay.title}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={{ marginTop: 6, minHeight: 34 }} />
+                      )}
                     </View>
-                    <Text className="text-white/70 text-xs mt-1">{day.day}</Text>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </View>
