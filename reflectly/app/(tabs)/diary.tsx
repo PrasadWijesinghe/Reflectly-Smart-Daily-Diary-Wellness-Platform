@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { getApiUrl } from "../../utils/api";
 import DiaryEditor from "../../components/DiaryEditor";
 import DiaryCard from "../../components/DiaryCard";
@@ -57,6 +58,7 @@ function formatDate(isoDate: string): string {
 
 export default function DiaryScreen() {
   const { token } = useAuth();
+  const { theme } = useTheme();
   const router = useRouter();
   const today = toDateString(new Date());
 
@@ -179,7 +181,7 @@ export default function DiaryScreen() {
 
       {/* Header */}
       <LinearGradient
-        colors={["#3B82F6", "#2563EB", "#1D4ED8"]}
+        colors={theme.gradient}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -203,7 +205,7 @@ export default function DiaryScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         {/* Selected Date */}
-        <View style={styles.dateCard}>
+        <View style={[styles.dateCard, { backgroundColor: "#FFFFFF" }]}>
           <View>
             <Text style={styles.dateLabel}>
               {isToday ? "Today" : formatDate(selectedDate)}
@@ -213,14 +215,14 @@ export default function DiaryScreen() {
             </Text>
           </View>
           <TouchableOpacity onPress={() => setCalendarVisible(true)}>
-            <Ionicons name="calendar-outline" size={24} color="#3B82F6" />
+            <Ionicons name="calendar-outline" size={24} color={theme.primary} />
           </TouchableOpacity>
         </View>
 
         {/* Entry Content */}
         {loadingEntry ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#3B82F6" />
+            <ActivityIndicator size="small" color={theme.primary} />
           </View>
         ) : currentEntry && !editing ? (
           <DiaryCard
@@ -247,13 +249,13 @@ export default function DiaryScreen() {
             <Text style={styles.pastTitle}>Past Entries</Text>
           </View>
             <TouchableOpacity onPress={() => router.push("/viewall-diary")}>
-              <Text style={styles.viewAllText}>View All</Text>
+              <Text style={[styles.viewAllText, { color: theme.primary }]}>View All</Text>
             </TouchableOpacity>
         </View>
 
         {loadingPast ? (
           <View style={{ paddingVertical: 20, alignItems: "center" }}>
-            <ActivityIndicator size="small" color="#3B82F6" />
+            <ActivityIndicator size="small" color={theme.primary} />
           </View>
         ) : pastEntries.length === 0 ? (
           <View style={{ paddingVertical: 20, alignItems: "center" }}>
@@ -265,7 +267,7 @@ export default function DiaryScreen() {
           pastEntries.map((entry) => (
             <TouchableOpacity
               key={entry.id}
-              style={styles.pastEntryCard}
+              style={[styles.pastEntryCard, { backgroundColor: theme.primarySoft }]}
               onPress={() => handleDateSelect(toDateString(new Date(entry.date)))}
             >
               <View style={styles.pastEntryTop}>
@@ -279,7 +281,7 @@ export default function DiaryScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
               </View>
-              <Text style={styles.pastEntryText}>{entry.summary}</Text>
+              <Text style={[styles.pastEntryText, { color: "#1F2937" }]}>{entry.summary}</Text>
               <View style={styles.pastEntryTags}>
                 {entry.tags.map((tag) => (
                   <View
@@ -402,7 +404,6 @@ const styles = StyleSheet.create({
     color: "#3B82F6",
   },
   pastEntryCard: {
-    backgroundColor: "#FFFBEB",
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,

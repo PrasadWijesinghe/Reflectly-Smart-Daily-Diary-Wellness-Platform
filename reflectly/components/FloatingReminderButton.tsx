@@ -14,14 +14,21 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import {
+  OPEN_REMINDERS_EVENT,
+  REMINDERS_UPDATED_EVENT,
+  REMINDER_STORAGE_PREFIX,
+  getScopedStorageKey,
+  loadScopedJsonList,
+  saveScopedJsonList,
+} from "../utils/notifications";
 import MonthCalendar from "./MonthCalendar";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const STORAGE_KEY = "reflectly_reminders";
-const REMINDERS_UPDATED_EVENT = "reflectly:reminders-updated";
 
 type Reminder = {
   id: string;
@@ -45,6 +52,8 @@ function formatReminderDate(date: string) {
 }
 
 export default function FloatingReminderButton() {
+  const { user } = useAuth();
+  const { theme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isOpen, setIsOpen] = useState(false);
   const [calendarVisible, setCalendarVisible] = useState(false);
@@ -53,15 +62,22 @@ export default function FloatingReminderButton() {
   const [selectedDate, setSelectedDate] = useState(toDateString(new Date()));
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const scopedKey = user?.id ? getScopedStorageKey(REMINDER_STORAGE_PREFIX, user.id) : null;
 
   useEffect(() => {
     loadReminders();
+  }, [scopedKey]);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(OPEN_REMINDERS_EVENT, openReminderModal);
+    return () => subscription.remove();
   }, []);
 
   async function loadReminders() {
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      const parsed = stored ? JSON.parse(stored) : [];
+      const parsed = scopedKey
+        ? await loadScopedJsonList<Reminder>(REMINDER_STORAGE_PREFIX, user?.id, "reflectly_reminders")
+        : [];
       setReminders(Array.isArray(parsed) ? parsed : []);
     } catch (error) {
       console.error("Failed to load reminders:", error);
@@ -70,7 +86,9 @@ export default function FloatingReminderButton() {
   }
 
   async function persistReminders(nextReminders: Reminder[]) {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextReminders));
+    if (user?.id) {
+      await saveScopedJsonList(REMINDER_STORAGE_PREFIX, user.id, nextReminders);
+    }
     setReminders(nextReminders);
     DeviceEventEmitter.emit(REMINDERS_UPDATED_EVENT);
   }
@@ -170,9 +188,9 @@ export default function FloatingReminderButton() {
             keyboardVerticalOffset={0}
           >
             <View style={styles.sheet}>
-              <LinearGradient colors={["#F59E0B", "#EA580C"]} style={styles.header}>
+              <LinearGradient colors={theme.gradient} style={styles.header}>
                 <View style={styles.headerLeft}>
-                  <View style={styles.headerIcon}>
+                  <View style={[styles.headerIcon, { backgroundColor: theme.surfaceTint }]}>
                     <Ionicons name="notifications" size={20} color="#FFFFFF" />
                   </View>
                   <View>
@@ -220,8 +238,8 @@ export default function FloatingReminderButton() {
                     activeOpacity={0.8}
                   >
                     <View style={styles.dateButtonLeft}>
-                      <Ionicons name="calendar-outline" size={18} color="#F59E0B" />
-                      <Text style={styles.dateButtonText}>{formatReminderDate(selectedDate)}</Text>
+                      <Ionicons name="calendar-outline" size={18} color={theme.primary} />
+                      <Text style={[styles.dateButtonText, { color: theme.textAccent }]}>{formatReminderDate(selectedDate)}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                   </TouchableOpacity>

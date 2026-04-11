@@ -15,7 +15,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { getApiUrl } from "../../utils/api";
+import { THEMES, ThemeId } from "../../utils/theme";
 
 type SettingRow = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -32,6 +34,14 @@ type ProfileUser = {
   createdAt: string;
   appLockEnabled?: boolean;
   appLockType?: "pin" | "password" | null;
+};
+
+const THEME_LABELS: Record<ThemeId, string> = {
+  blue: "Blue",
+  green: "Green",
+  purple: "Purple",
+  yellow: "Yellow",
+  red: "Red",
 };
 
 type DiaryEntry = {
@@ -53,6 +63,13 @@ const DIARY_PREFS: SettingRow[] = [
     label: "Daily Reminders",
     value: "On",
     valueColor: "#10B981",
+  },
+  {
+    icon: "color-palette",
+    iconColor: "#8B5CF6",
+    label: "App Theme",
+    value: "Blue",
+    valueColor: "#8B5CF6",
   },
 ];
 
@@ -152,11 +169,13 @@ function SettingItem({ item, onPress }: { item: SettingRow; onPress?: () => void
 export default function ProfileScreen() {
   const router = useRouter();
   const { logout, token, user, setupAppLock, disableAppLock } = useAuth();
+  const { theme, themeId, setThemeId } = useTheme();
   const [profile, setProfile] = useState<ProfileUser | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isThemeModalVisible, setIsThemeModalVisible] = useState(false);
   const [isLockModalVisible, setIsLockModalVisible] = useState(false);
   const [lockType, setLockType] = useState<"pin" | "password">("pin");
   const [lockValue, setLockValue] = useState("");
@@ -213,7 +232,7 @@ export default function ProfileScreen() {
     loadProfileData();
   }, [token]);
 
-  const privacyItems = useMemo<SettingRow[]>(
+  const diaryItems = useMemo<SettingRow[]>(
     () => [
       {
         icon: "lock-closed",
@@ -235,6 +254,20 @@ export default function ProfileScreen() {
       },
     ],
     [profile?.appLockEnabled, profile?.appLockType]
+  );
+
+  const diaryPrefs = useMemo<SettingRow[]>(
+    () =>
+      DIARY_PREFS.map((item) =>
+        item.label === "App Theme"
+          ? {
+              ...item,
+              value: THEME_LABELS[themeId],
+              valueColor: theme.primary,
+            }
+          : item
+      ),
+    [theme.primary, themeId]
   );
 
   async function handleLogout() {
@@ -313,6 +346,15 @@ export default function ProfileScreen() {
     }
   }
 
+  async function handleThemeSelect(nextThemeId: ThemeId) {
+    try {
+      await setThemeId(nextThemeId);
+      setIsThemeModalVisible(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update theme.");
+    }
+  }
+
   const stats = useMemo(
     () => [
       { value: String(entries.length), label: "Entries", emoji: "📝" },
@@ -332,7 +374,7 @@ export default function ProfileScreen() {
       <StatusBar barStyle="light-content" />
 
       <LinearGradient
-        colors={["#3B82F6", "#2563EB", "#1D4ED8"]}
+        colors={theme.gradient}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -356,12 +398,12 @@ export default function ProfileScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={() => loadProfileData(true)}
-            tintColor="#3B82F6"
+            tintColor={theme.primary}
           />
         }
       >
         <LinearGradient
-          colors={["#3B82F6", "#6366F1", "#7C3AED"]}
+          colors={[theme.primary, theme.primaryDark, theme.primary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.profileCard}
@@ -402,23 +444,26 @@ export default function ProfileScreen() {
 
         <Text style={styles.sectionLabel}>DIARY PREFERENCES</Text>
         <View style={styles.sectionCard}>
-          {DIARY_PREFS.map((item, i) => (
+          {diaryPrefs.map((item, i) => (
             <View key={i}>
-              <SettingItem item={item} />
-              {i < DIARY_PREFS.length - 1 && <View style={styles.divider} />}
+              <SettingItem
+                item={item}
+                onPress={item.label === "App Theme" ? () => setIsThemeModalVisible(true) : undefined}
+              />
+              {i < diaryPrefs.length - 1 && <View style={styles.divider} />}
             </View>
           ))}
         </View>
 
         <Text style={styles.sectionLabel}>PRIVACY & SECURITY</Text>
         <View style={styles.sectionCard}>
-          {privacyItems.map((item, i) => (
+          {diaryItems.map((item, i) => (
             <View key={i}>
               <SettingItem
                 item={item}
                 onPress={item.label === "App Lock" ? () => setIsLockModalVisible(true) : undefined}
               />
-              {i < privacyItems.length - 1 && <View style={styles.divider} />}
+              {i < diaryItems.length - 1 && <View style={styles.divider} />}
             </View>
           ))}
         </View>
@@ -438,10 +483,48 @@ export default function ProfileScreen() {
           onPress={handleLogout}
           activeOpacity={0.8}
         >
-          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+          <Ionicons name="log-out-outline" size={20} color={theme.danger} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={isThemeModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsThemeModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Choose Theme</Text>
+              <TouchableOpacity onPress={() => setIsThemeModalVisible(false)} activeOpacity={0.7}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>Pick a color mood for the whole app.</Text>
+
+            <View style={styles.themeGrid}>
+              {THEMES.map((item) => {
+                const selected = item.id === themeId;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.themeCard, selected && styles.themeCardActive]}
+                    onPress={() => handleThemeSelect(item.id)}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient colors={item.gradient} style={styles.themeSwatch} />
+                    <Text style={styles.themeName}>{item.name}</Text>
+                    <Text style={styles.themeLabel}>{selected ? "Selected" : "Tap to apply"}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={isLockModalVisible}
@@ -753,6 +836,39 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
     padding: 20,
+  },
+  themeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 18,
+  },
+  themeCard: {
+    width: "47%",
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  themeCardActive: {
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+  },
+  themeSwatch: {
+    height: 44,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+  themeName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  themeLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#64748B",
   },
   modalHeader: {
     flexDirection: "row",

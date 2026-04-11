@@ -12,7 +12,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
+import { DeviceEventEmitter } from "react-native";
 import { getApiUrl } from "../utils/api";
+import { DIARY_UPDATED_EVENT } from "../utils/notifications";
 import ConfirmModal from "./ConfirmModal";
 
 type RecordingState = "idle" | "recording" | "processing";
@@ -71,6 +73,7 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      DeviceEventEmitter.emit(DIARY_UPDATED_EVENT);
       onSave();
     } catch (err: any) {
       console.error("Save entry error:", err);
