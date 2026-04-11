@@ -1,14 +1,11 @@
 const prisma = require("../utils/prisma");
-<<<<<<< HEAD
 const {
   incrementDiaryEntriesCreated,
   incrementDiaryEntriesUpdated,
   incrementDiaryEntriesDeleted,
 } = require("../utils/metrics");
-=======
 const { generateAISummary } = require("../utils/gemini");
 const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
->>>>>>> 9155e1b779a4e757d38b158c046e3bf87a6cc746
 
 function generateSummary(content) {
   const trimmed = content.trim();
@@ -386,12 +383,8 @@ async function createEntry(req, res) {
       include: { tags: true },
     });
 
-<<<<<<< HEAD
     incrementDiaryEntriesCreated();
-=======
     await regenerateWeekSummary(req.user.userId, normalizedDate);
-
->>>>>>> 9155e1b779a4e757d38b158c046e3bf87a6cc746
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {
     if (err.code === "P2002") {
@@ -453,12 +446,8 @@ async function updateEntry(req, res) {
       include: { tags: true },
     });
 
-<<<<<<< HEAD
     incrementDiaryEntriesUpdated();
-=======
     await regenerateWeekSummary(req.user.userId, existing.date);
-
->>>>>>> 9155e1b779a4e757d38b158c046e3bf87a6cc746
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
     console.error("UpdateEntry error:", err);
@@ -478,12 +467,8 @@ async function deleteEntry(req, res) {
 
     await prisma.dailyDiary.delete({ where: { id: existing.id } });
 
-<<<<<<< HEAD
     incrementDiaryEntriesDeleted();
-=======
     await regenerateWeekSummary(req.user.userId, existing.date);
-
->>>>>>> 9155e1b779a4e757d38b158c046e3bf87a6cc746
     res.json({ message: "Entry deleted." });
   } catch (err) {
     console.error("DeleteEntry error:", err);
