@@ -11,7 +11,20 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 
-type GameRoute = "/games/calm-breathing" | "/games/memory-match" | "/games/game-2048";
+type GameRoute =
+  | "/games/calm-breathing"
+  | "/games/memory-match"
+  | "/games/game-2048"
+  | "/games/word-scramble"
+  | "/games/color-match"
+  | "/games/pattern-memory"
+  | "/games/balloon-pop"
+  | "/games/tapping-game"
+  | "/games/math-quick"
+  | "/games/shadow-match"
+  | "/games/number-tap"
+  | "/games/dot-connect"
+  | "/games/bubble-breaker";
 
 type Game = {
   id: number;
@@ -62,6 +75,114 @@ const GAMES: Game[] = [
     difficulty: "Puzzle",
     duration: "5 min",
     accent: "#0F172A",
+  },
+  {
+    id: 4,
+    title: "Word Scramble",
+    subtitle: "Unscramble letters to form words!",
+    icon: "text-outline",
+    route: "/games/word-scramble",
+    iconBg: "#059669",
+    cardBg: "#DCFCE7",
+    difficulty: "Easy",
+    duration: "10 min",
+    accent: "#047857",
+  },
+  {
+    id: 5,
+    title: "Color Match",
+    subtitle: "Match colors to their names with time pressure!",
+    icon: "color-palette-outline",
+    route: "/games/color-match",
+    iconBg: "#F59E0B",
+    cardBg: "#FFF7ED",
+    difficulty: "Focus",
+    duration: "2 min",
+    accent: "#EA580C",
+  },
+  {
+    id: 6,
+    title: "Pattern Memory",
+    subtitle: "Repeat the pattern of colors!",
+    icon: "sparkles-outline",
+    route: "/games/pattern-memory",
+    iconBg: "#7C3AED",
+    cardBg: "#F3E8FF",
+    difficulty: "Memory",
+    duration: "3 min",
+    accent: "#6D28D9",
+  },
+  {
+    id: 7,
+    title: "Balloon Pop",
+    subtitle: "Tap falling balloons for points!",
+    icon: "balloon-outline",
+    route: "/games/balloon-pop",
+    iconBg: "#EC4899",
+    cardBg: "#FCE7F3",
+    difficulty: "Quick Reflex",
+    duration: "30s",
+    accent: "#BE185D",
+  },
+  {
+    id: 8,
+    title: "Tapping Game",
+    subtitle: "Tap targets before they disappear!",
+    icon: "finger-outline",
+    route: "/games/tapping-game",
+    iconBg: "#DC2828",
+    cardBg: "#FFE5E5",
+    difficulty: "Reflex",
+    duration: "30s",
+    accent: "#991B1B",
+  },
+  {
+    id: 9,
+    title: "Math Quick",
+    subtitle: "Solve math problems in 60 seconds!",
+    icon: "calculator-outline",
+    route: "/games/math-quick",
+    iconBg: "#F59E0B",
+    cardBg: "#FEF3C7",
+    difficulty: "Medium",
+    duration: "1 min",
+    accent: "#EA580C",
+  },
+  {
+    id: 10,
+    title: "Shadow Match",
+    subtitle: "Find the matching shape from the options!",
+    icon: "disc-outline",
+    route: "/games/shadow-match",
+    iconBg: "#0891B2",
+    cardBg: "#CFFAFE",
+    difficulty: "Focus",
+    duration: "3 min",
+    accent: "#0E7490",
+  },
+  {
+    id: 11,
+    title: "Number Tap",
+    subtitle: "Tap numbers in order! Wrong tap = game over!",
+    icon: "keypad-outline",
+    route: "/games/number-tap",
+    iconBg: "#2563EB",
+    cardBg: "#DBEAFE",
+    difficulty: "Quick Reflex",
+    duration: "1 min",
+    accent: "#1D4ED8",
+  },
+  {
+    id: 12,
+    title: "Dot Connect",
+    subtitle: "Match pairs of dots and draw connections!",
+    icon: "git-commit-outline",
+    route: "/games/dot-connect",
+    iconBg: "#EC4899",
+    cardBg: "#FDF2F8",
+    difficulty: "Memory",
+    duration: "3 min",
+    accent: "#EC4899",
   },
 ];
 

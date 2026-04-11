@@ -12,6 +12,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { getGameBestScore, saveGameBestScore } from "../../utils/gameScores";
+
+const GAME_ID = "calm-breathing";
 
 type Phase = "Inhale" | "Hold" | "Exhale";
 
@@ -29,6 +32,26 @@ export default function CalmBreathingScreen() {
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [cycleCount, setCycleCount] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(Math.ceil(PHASES[0].durationMs / 1000));
+  const [bestScore, setBestScore] = useState(0);
+  const [score, setScore] = useState(0);
+  const [showStart, setShowStart] = useState(true);
+
+  useEffect(() => {
+    loadBestScore();
+  }, []);
+
+  async function loadBestScore() {
+    const savedScore = await getGameBestScore(GAME_ID);
+    setBestScore(savedScore);
+  }
+
+  function startGame() {
+    setShowStart(false);
+    setScore(0);
+    setCycleCount(0);
+    setPhaseIndex(0);
+    setIsRunning(true);
+  }
 
   const currentPhase = PHASES[phaseIndex];
 
@@ -81,11 +104,19 @@ export default function CalmBreathingScreen() {
     }
 
     schedule(() => {
-      const nextIndex = (index + 1) % PHASES.length;
-      if (nextIndex === 0) {
-        setCycleCount((prev) => prev + 1);
-      }
-      setPhaseIndex(nextIndex);
+      setCycleCount((prevCycle) => {
+        const newCycle = prevCycle + 1;
+        const newScore = newCycle * 50;
+        setScore(newScore);
+        
+        if (newScore > bestScore) {
+          setBestScore(newScore);
+          saveGameBestScore(GAME_ID, newScore);
+        }
+        
+        return newCycle;
+      });
+      setPhaseIndex((index + 1) % PHASES.length);
     }, phase.durationMs);
   }
 
@@ -100,6 +131,7 @@ export default function CalmBreathingScreen() {
     setIsRunning(false);
     setPhaseIndex(0);
     setCycleCount(0);
+    setScore(0);
     setSecondsLeft(Math.ceil(PHASES[0].durationMs / 1000));
   }
 
@@ -127,62 +159,96 @@ export default function CalmBreathingScreen() {
         </TouchableOpacity>
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>Calm Breathing</Text>
-          <Text style={styles.headerSubtitle}>A quick reset between study sessions</Text>
         </View>
       </LinearGradient>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Current phase</Text>
-          <Text style={styles.phaseText}>{currentPhase.label}</Text>
-          <Text style={styles.timerText}>{secondsLeft}s</Text>
-
-          <View style={styles.orbit}>
-            <Animated.View style={[styles.breathCircle, { transform: [{ scale }] }]}>
-              <LinearGradient
-                colors={["#DDD6FE", "#C4B5FD", "#8B5CF6"]}
-                style={styles.innerCircle}
-              >
-                <Ionicons name="leaf-outline" size={34} color="#FFFFFF" />
-              </LinearGradient>
-            </Animated.View>
+      {showStart ? (
+        <View style={styles.startScreen}>
+          <Text style={{ fontSize: 70 }}>🧘</Text>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsTitle}>How to Play</Text>
+            <Text style={styles.instructionsText}>
+              Follow the breathing circle!{"\n"}
+              Inhale → Hold → Exhale{"\n"}
+              Complete cycles to score points.
+            </Text>
           </View>
-
-          <Text style={styles.tipText}>{encouragement}</Text>
-
-          <View style={styles.controlRow}>
-            <TouchableOpacity style={styles.primaryButton} onPress={handleStartPause} activeOpacity={0.85}>
-              <Ionicons name={isRunning ? "pause" : "play"} size={18} color="#FFFFFF" />
-              <Text style={styles.primaryButtonText}>{isRunning ? "Pause" : "Start"}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryButton} onPress={handleReset} activeOpacity={0.85}>
-              <Ionicons name="refresh" size={18} color="#6D28D9" />
-              <Text style={styles.secondaryButtonText}>Reset</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.startButton} onPress={startGame} activeOpacity={0.85}>
+            <Ionicons name="play" size={24} color="#FFFFFF" />
+            <Text style={styles.startButtonText}>Start</Text>
+          </TouchableOpacity>
         </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{cycleCount}</Text>
-            <Text style={styles.statLabel}>Completed cycles</Text>
+      ) : (
+        <View style={styles.gameContent}>
+          <View style={styles.statsRow}>
+            <View style={styles.scoreCard}>
+              <Text style={styles.scoreLabel}>Cycles</Text>
+              <Text style={styles.scoreValue}>{cycleCount}</Text>
+            </View>
+            <View style={styles.scoreCard}>
+              <Text style={styles.scoreLabel}>Score</Text>
+              <Text style={styles.scoreValue}>{score}</Text>
+            </View>
+            <View style={styles.scoreCard}>
+              <Text style={styles.scoreLabel}>Best</Text>
+              <Text style={styles.scoreValue}>{bestScore}</Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>4-2-4.5</Text>
-            <Text style={styles.statLabel}>Breath timing</Text>
-          </View>
-        </View>
 
-        <View style={styles.instructionsCard}>
-          <Text style={styles.instructionsTitle}>How to use it</Text>
-          <Text style={styles.instructionsText}>Inhale as the circle grows, hold gently, then exhale as it shrinks.</Text>
-          <Text style={styles.instructionsText}>Try 3 to 5 cycles before going back to your work.</Text>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.heroCard}>
+              <Text style={styles.heroLabel}>Current phase</Text>
+              <Text style={styles.phaseText}>{currentPhase.label}</Text>
+              <Text style={styles.timerText}>{secondsLeft}s</Text>
+
+              <View style={styles.orbit}>
+                <Animated.View style={[styles.breathCircle, { transform: [{ scale }] }]}>
+                  <LinearGradient
+                    colors={["#DDD6FE", "#C4B5FD", "#8B5CF6"]}
+                    style={styles.innerCircle}
+                  >
+                    <Ionicons name="leaf-outline" size={34} color="#FFFFFF" />
+                  </LinearGradient>
+                </Animated.View>
+              </View>
+
+              <Text style={styles.tipText}>{encouragement}</Text>
+
+              <View style={styles.controlRow}>
+                <TouchableOpacity style={styles.primaryButton} onPress={handleStartPause} activeOpacity={0.85}>
+                  <Ionicons name={isRunning ? "pause" : "play"} size={18} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>{isRunning ? "Pause" : "Start"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryButton} onPress={handleReset} activeOpacity={0.85}>
+                  <Ionicons name="refresh" size={18} color="#6D28D9" />
+                  <Text style={styles.secondaryButtonText}>Reset</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{cycleCount}</Text>
+                <Text style={styles.statLabel}>Completed cycles</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>4-2-4.5</Text>
+                <Text style={styles.statLabel}>Breath timing</Text>
+              </View>
+            </View>
+
+            <View style={styles.instructionsCard}>
+              <Text style={styles.instructionsTitle}>How to use it</Text>
+              <Text style={styles.instructionsText}>Inhale as the circle grows, hold gently, then exhale as it shrinks.</Text>
+              <Text style={styles.instructionsText}>Try 3 to 5 cycles before going back to your work.</Text>
+            </View>
+          </ScrollView>
         </View>
-      </ScrollView>
+      )}
     </View>
   );
 }
@@ -194,8 +260,13 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   headerTitle: { fontSize: 24, fontWeight: "700", color: "#FFFFFF" },
   headerSubtitle: { fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 4 },
+  gameContent: { flex: 1 },
+  statsRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  scoreCard: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 16, padding: 12, alignItems: "center" },
+  scoreLabel: { fontSize: 10, fontWeight: "700", color: "#6B7280", textTransform: "uppercase" },
+  scoreValue: { fontSize: 18, fontWeight: "700", color: "#7C3AED", marginTop: 4 },
   scrollView: { flex: 1 },
-  content: { padding: 20, paddingBottom: 36 },
+  content: { padding: 20, paddingBottom: 20 },
   heroCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 22, alignItems: "center", shadowColor: "#6D28D9", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
   heroLabel: { fontSize: 12, fontWeight: "700", color: "#8B5CF6", textTransform: "uppercase", letterSpacing: 1 },
   phaseText: { fontSize: 30, fontWeight: "700", color: "#312E81", marginTop: 8 },
@@ -204,7 +275,7 @@ const styles = StyleSheet.create({
   breathCircle: { width: 140, height: 140, borderRadius: 70, alignItems: "center", justifyContent: "center" },
   innerCircle: { width: "100%", height: "100%", borderRadius: 999, alignItems: "center", justifyContent: "center" },
   tipText: { fontSize: 14, lineHeight: 22, color: "#5B587A", textAlign: "center" },
-  controlRow: { flexDirection: "row", gap: 12, marginTop: 22 },
+  controlRow: { flexDirection: "row", gap: 12, marginTop: 10 },
   primaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#7C3AED", paddingHorizontal: 22, paddingVertical: 14, borderRadius: 16, gap: 8, minWidth: 124 },
   primaryButtonText: { fontSize: 15, fontWeight: "700", color: "#FFFFFF" },
   secondaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#F5F3FF", paddingHorizontal: 22, paddingVertical: 14, borderRadius: 16, gap: 8, minWidth: 124 },
@@ -215,5 +286,8 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, color: "#7C7A92", marginTop: 4 },
   instructionsCard: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 18, marginTop: 18 },
   instructionsTitle: { fontSize: 16, fontWeight: "700", color: "#312E81", marginBottom: 10 },
-  instructionsText: { fontSize: 14, lineHeight: 22, color: "#5B587A", marginBottom: 6 },
+  instructionsText: { fontSize: 13, color: "#5B587A", lineHeight: 20 },
+  startScreen: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
+  startButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#8B5CF6", borderRadius: 16, paddingVertical: 14, paddingHorizontal: 28, marginTop: 16, gap: 8 },
+  startButtonText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
 });
