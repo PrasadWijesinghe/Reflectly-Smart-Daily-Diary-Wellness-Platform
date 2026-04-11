@@ -197,11 +197,11 @@ export default function InsightsScreen() {
         <View style={[styles.toggleContainer, { backgroundColor: theme.primarySoft }]}>
           <TouchableOpacity style={[styles.toggleButton, activeTab === "7days" && { backgroundColor: theme.primary }]} onPress={() => setActiveTab("7days")}>
             <Ionicons name="calendar-outline" size={16} color={activeTab === "7days" ? "#FFFFFF" : "#6B7280"} style={{ marginRight: 6 }} />
-            <Text style={[styles.toggleText, activeTab === "7days" && styles.toggleTextActive]}>7 Days</Text>
+            <Text style={[styles.toggleText, activeTab === "7days" && styles.toggleTextActive]}>Daily Summary</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.toggleButton, activeTab === "30days" && { backgroundColor: theme.primary }]} onPress={() => setActiveTab("30days")}>
             <Ionicons name="calendar" size={16} color={activeTab === "30days" ? "#FFFFFF" : "#6B7280"} style={{ marginRight: 6 }} />
-            <Text style={[styles.toggleText, activeTab === "30days" && styles.toggleTextActive]}>30 Days</Text>
+            <Text style={[styles.toggleText, activeTab === "30days" && styles.toggleTextActive]}>Weekly Summary</Text>
           </TouchableOpacity>
         </View>
 
@@ -255,6 +255,9 @@ export default function InsightsScreen() {
                   <View style={styles.stressBarBg}>
                     <View style={[styles.stressBar, { height, backgroundColor: isHigh ? theme.warning : theme.primary }]} />
                   </View>
+                  <Text style={[styles.stressPercent, { color: isHigh ? theme.warning : theme.primaryDark }]}>
+                    {val}%
+                  </Text>
                   <Text style={styles.stressDay}>{key}</Text>
                 </View>
               );
@@ -522,6 +525,11 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     fontWeight: "600",
     marginTop: 8,
+  },
+  stressPercent: {
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 4,
   },
   stressTip: {
     backgroundColor: "#FFFBEB",

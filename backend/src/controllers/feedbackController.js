@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const { incrementFeedbackSubmitted } = require("../utils/metrics");
 
 async function submitFeedback(req, res) {
   try {
@@ -14,6 +15,7 @@ async function submitFeedback(req, res) {
       },
     });
 
+    incrementFeedbackSubmitted();
     return res.status(201).json({ success: true, feedback });
   } catch (err) {
     console.error("Submit feedback error:", err);

@@ -1,4 +1,9 @@
 const prisma = require("../utils/prisma");
+const {
+  incrementDiaryEntriesCreated,
+  incrementDiaryEntriesUpdated,
+  incrementDiaryEntriesDeleted,
+} = require("../utils/metrics");
 
 function generateSummary(content) {
   const trimmed = content.trim();
@@ -62,6 +67,127 @@ function getMoodEmoji(entry) {
   }
 
   return null;
+}
+
+function getStressScore(entry) {
+  const content = `${entry.content || ""} ${entry.summary || ""}`.toLowerCase();
+
+  if (content.includes("anxious") || content.includes("stress") || content.includes("overwhelmed") || content.includes("panic") || content.includes("burnout")) {
+    return 85;
+  }
+  if (content.includes("sad") || content.includes("frustrated") || content.includes("angry") || content.includes("tired")) {
+    return 60;
+  }
+  if (content.includes("calm") || content.includes("peaceful") || content.includes("relaxed") || content.includes("grateful") || content.includes("hopeful")) {
+    return 20;
+  }
+  if (entry.content) {
+    return 35;
+  }
+
+  return 0;
+}
+
+function getStressLabel(percentage) {
+  if (percentage >= 70) return "High";
+  if (percentage >= 40) return "Moderate";
+  if (percentage > 0) return "Light";
+  return "No data";
+}
+
+function buildWeeklySuggestions(stressPercentage, hasEntries, hasHighStressEntry) {
+  const suggestions = [];
+
+  if (!hasEntries) {
+    suggestions.push({
+      title: "Write today’s diary",
+      subtitle: "A quick entry gives the week more context.",
+      icon: "create-outline",
+      color: "#3B82F6",
+      route: "/(tabs)/diary",
+    });
+    suggestions.push({
+      title: "Try calm breathing",
+      subtitle: "A short reset helps before the day gets busy.",
+      icon: "leaf-outline",
+      color: "#10B981",
+      route: "/games/calm-breathing",
+    });
+    return suggestions;
+  }
+
+  if (stressPercentage >= 70 || hasHighStressEntry) {
+    suggestions.push({
+      title: "Use the breathing reset",
+      subtitle: "Best first step when the week feels heavy.",
+      icon: "leaf-outline",
+      color: "#10B981",
+      route: "/games/calm-breathing",
+    });
+    suggestions.push({
+      title: "Open a quick game",
+      subtitle: "A short puzzle can lower the pressure a bit.",
+      icon: "game-controller-outline",
+      color: "#3B82F6",
+      route: "/(tabs)/games",
+    });
+    suggestions.push({
+      title: "Write what is stressing you",
+      subtitle: "Getting it out on the page can help organize it.",
+      icon: "create-outline",
+      color: "#8B5CF6",
+      route: "/(tabs)/diary",
+    });
+    return suggestions;
+  }
+
+  if (stressPercentage >= 40) {
+    suggestions.push({
+      title: "Take a 5-minute break",
+      subtitle: "A short pause can make the rest of the day easier.",
+      icon: "time-outline",
+      color: "#F59E0B",
+      route: "/games/calm-breathing",
+    });
+    suggestions.push({
+      title: "Play a quick game",
+      subtitle: "A small puzzle can help you shift focus.",
+      icon: "game-controller-outline",
+      color: "#3B82F6",
+      route: "/(tabs)/games",
+    });
+    suggestions.push({
+      title: "Add a reminder",
+      subtitle: "Set one small task to keep the week on track.",
+      icon: "notifications-outline",
+      color: "#8B5CF6",
+      route: "/(tabs)/profile",
+    });
+    return suggestions;
+  }
+
+  suggestions.push({
+    title: "Keep journaling daily",
+    subtitle: "Your notes help the insights become more accurate.",
+    icon: "journal-outline",
+    color: "#3B82F6",
+    route: "/(tabs)/diary",
+  });
+  suggestions.push({
+    title: "Review this week’s progress",
+    subtitle: "Small wins build a stronger routine over time.",
+    icon: "analytics-outline",
+    color: "#8B5CF6",
+    route: "/(tabs)/insights",
+  });
+  suggestions.push({
+    title: "Take a short walk",
+    subtitle: "A little movement keeps the day balanced.",
+    icon: "walk-outline",
+    color: "#10B981",
+    route: "/(tabs)/games",
+  });
+  return suggestions;
 }
 
 async function getEntryDates(req, res) {
@@ -141,6 +267,12 @@ async function getMoodTrend(req, res) {
       ])
     );
 
+    const stressValues = entries.map((entry) => getStressScore(entry)).filter((value) => value > 0);
+    const stressPercentage = stressValues.length
+      ? Math.round(stressValues.reduce((sum, value) => sum + value, 0) / stressValues.length)
+      : 0;
+    const hasHighStressEntry = stressValues.some((value) => value >= 70);
+
     const responseDays = [];
 
     for (let index = 0; index < days; index += 1) {
@@ -159,7 +291,16 @@ async function getMoodTrend(req, res) {
       });
     }
 
-    res.json({ days: responseDays });
+    res.json({
+      days: responseDays,
+      summary: {
+        stressPercentage,
+        stressLabel: getStressLabel(stressPercentage),
+        hasEntries: entries.length > 0,
+        hasHighStressEntry,
+        suggestions: buildWeeklySuggestions(stressPercentage, entries.length > 0, hasHighStressEntry),
+      },
+    });
   } catch (err) {
     console.error("GetMoodTrend error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -238,6 +379,7 @@ async function createEntry(req, res) {
       include: { tags: true },
     });
 
+    incrementDiaryEntriesCreated();
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {
     if (err.code === "P2002") {
@@ -297,6 +439,7 @@ async function updateEntry(req, res) {
       include: { tags: true },
     });
 
+    incrementDiaryEntriesUpdated();
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
     console.error("UpdateEntry error:", err);
@@ -316,6 +459,7 @@ async function deleteEntry(req, res) {
 
     await prisma.dailyDiary.delete({ where: { id: existing.id } });
 
+    incrementDiaryEntriesDeleted();
     res.json({ message: "Entry deleted." });
   } catch (err) {
     console.error("DeleteEntry error:", err);
