@@ -35,7 +35,6 @@ type Reminder = {
   createdAt: string;
 };
 
-const STRESS_LEVEL = 65;
 const REMINDER_STORAGE_KEY = "reflectly_reminders";
 const REMINDERS_UPDATED_EVENT = "reflectly:reminders-updated";
 const RANDOM_FACE_EMOJIS = ["😀", "😄", "🙂", "😊", "😌", "🤩", "🥳", "😎", "😁", "😇"];
@@ -44,6 +43,30 @@ const SUGGESTIONS = [
   { icon: "time-outline" as const, title: "Take a 5-min break", subtitle: "Short breaks boost productivity", color: "#F59E0B" },
   { icon: "walk-outline" as const, title: "Go for a short walk", subtitle: "Fresh air clears your mind", color: "#8B5CF6" },
 ];
+
+type WeeklySummarySuggestion = {
+  title: string;
+  subtitle: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  route?: string;
+};
+
+type WeeklySummary = {
+  stressPercentage: number;
+  stressLabel: string;
+  hasEntries: boolean;
+  hasHighStressEntry: boolean;
+  suggestions: WeeklySummarySuggestion[];
+};
+
+function getFallbackSuggestions(): WeeklySummarySuggestion[] {
+  return [
+    { icon: "game-controller-outline", title: "Play a quick game", subtitle: "Reduce stress with fun mini-games", color: "#3B82F6", route: "/(tabs)/games" },
+    { icon: "time-outline", title: "Take a 5-min break", subtitle: "Short breaks boost productivity", color: "#F59E0B", route: "/games/calm-breathing" },
+    { icon: "walk-outline", title: "Go for a short walk", subtitle: "Fresh air clears your mind", color: "#8B5CF6", route: "/(tabs)/games" },
+  ];
+}
 
 function getHomeMoodEmoji(day: MoodTrendDay) {
   if (day.emoji) return day.emoji;
@@ -74,6 +97,7 @@ export default function HomeScreen() {
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const [isLoadingWeekMoods, setIsLoadingWeekMoods] = useState(true);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+  const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -100,10 +124,12 @@ export default function HomeScreen() {
         const nextWeekMoods = Array.isArray(data.days) ? data.days : [];
         setWeekMoods(nextWeekMoods);
         setWeekFaces(getRandomWeekFaces(nextWeekMoods.length));
+        setWeeklySummary(data.summary || null);
       } catch (error) {
         console.error("Failed to load weekly vibe:", error);
         setWeekMoods([]);
         setWeekFaces([]);
+        setWeeklySummary(null);
       } finally {
         setIsLoadingWeekMoods(false);
       }
@@ -144,7 +170,9 @@ export default function HomeScreen() {
     return () => reminderSubscription.remove();
   }, [user?.id]);
 
-  const vibeLabel = weekMoods.some((day) => day.filled) ? "Live" : "No data";
+  const vibeLabel = weeklySummary?.stressLabel || (weekMoods.some((day) => day.filled) ? "Live" : "No data");
+  const stressLevel = weeklySummary?.stressPercentage ?? 0;
+  const suggestionItems = weeklySummary?.suggestions?.length ? weeklySummary.suggestions : getFallbackSuggestions();
   const notifications = applyReadState(
     buildHomeNotifications({
       weekMoods,
@@ -279,12 +307,12 @@ export default function HomeScreen() {
 
             <View className="flex-row items-center justify-between mb-1">
               <Text className="text-xs text-gray-500">Chill 😎</Text>
-              <Text className="text-xs font-bold text-blue-500">{STRESS_LEVEL} %</Text>
+              <Text className="text-xs font-bold text-blue-500">{stressLevel} %</Text>
               <Text className="text-xs text-gray-500">Stressed 😰</Text>
             </View>
 
             <View className="h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
-              <View style={{ height: "100%", width: `${STRESS_LEVEL}%`, borderRadius: 999, backgroundColor: "#3B82F6" }} />
+              <View style={{ height: "100%", width: `${stressLevel}%`, borderRadius: 999, backgroundColor: "#3B82F6" }} />
             </View>
 
             <View className="bg-blue-50 rounded-xl py-2.5 px-4">
@@ -329,8 +357,8 @@ export default function HomeScreen() {
               <Text className="mr-1.5">✨</Text>
               <Text className="font-bold text-gray-800 text-base">Suggestions for You</Text>
             </View>
-            {SUGGESTIONS.map((item, index) => (
-              <TouchableOpacity key={index} activeOpacity={0.7} className="bg-white rounded-2xl p-4 mb-3 shadow-sm flex-row items-center" onPress={item.title === "Play a quick game" ? () => router.push("/(tabs)/games") : undefined}>
+            {suggestionItems.map((item, index) => (
+              <TouchableOpacity key={index} activeOpacity={0.7} className="bg-white rounded-2xl p-4 mb-3 shadow-sm flex-row items-center" onPress={item.route ? () => router.push(item.route as any) : undefined}>
                 <View style={{ backgroundColor: `${item.color}15`, borderRadius: 12, padding: 10, marginRight: 12 }}>
                   <Ionicons name={item.icon} size={20} color={item.color} />
                 </View>
