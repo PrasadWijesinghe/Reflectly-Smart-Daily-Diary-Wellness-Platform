@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
+  TextInput,
   Text,
   TouchableOpacity,
   View,
@@ -13,7 +15,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { getApiUrl } from "../../utils/api";
+import { THEMES, ThemeId } from "../../utils/theme";
 
 type SettingRow = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -28,6 +32,16 @@ type ProfileUser = {
   name: string;
   email: string;
   createdAt: string;
+  appLockEnabled?: boolean;
+  appLockType?: "pin" | "password" | null;
+};
+
+const THEME_LABELS: Record<ThemeId, string> = {
+  blue: "Blue",
+  green: "Green",
+  purple: "Purple",
+  yellow: "Yellow",
+  red: "Red",
 };
 
 type DiaryEntry = {
@@ -50,22 +64,12 @@ const DIARY_PREFS: SettingRow[] = [
     value: "On",
     valueColor: "#10B981",
   },
-];
-
-const PRIVACY: SettingRow[] = [
   {
-    icon: "lock-closed",
-    iconColor: "#F59E0B",
-    label: "Privacy Settings",
-    value: "Private",
-    valueColor: "#3B82F6",
-  },
-  {
-    icon: "shield-checkmark",
-    iconColor: "#3B82F6",
-    label: "Data Security",
-    value: "Encrypted",
-    valueColor: "#3B82F6",
+    icon: "color-palette",
+    iconColor: "#8B5CF6",
+    label: "App Theme",
+    value: "Blue",
+    valueColor: "#8B5CF6",
   },
 ];
 
@@ -123,13 +127,16 @@ function calculateThisWeek(entries: DiaryEntry[]) {
   return entries.filter((entry) => new Date(entry.date) >= weekStart).length;
 }
 
-function SettingItem({ item }: { item: SettingRow }) {
+function SettingItem({ item, onPress }: { item: SettingRow; onPress?: () => void }) {
   const router = useRouter();
 
   const handlePress = () => {
     if (item.label === "Send Feedback") {
       router.push("/feedback");
+      return;
     }
+
+    onPress?.();
   };
 
   return (
@@ -161,12 +168,20 @@ function SettingItem({ item }: { item: SettingRow }) {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { logout, token, user } = useAuth();
+  const { logout, token, user, setupAppLock, disableAppLock } = useAuth();
+  const { theme, themeId, setThemeId } = useTheme();
   const [profile, setProfile] = useState<ProfileUser | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isThemeModalVisible, setIsThemeModalVisible] = useState(false);
+  const [isLockModalVisible, setIsLockModalVisible] = useState(false);
+  const [lockType, setLockType] = useState<"pin" | "password">("pin");
+  const [lockValue, setLockValue] = useState("");
+  const [lockConfirmValue, setLockConfirmValue] = useState("");
+  const [lockError, setLockError] = useState<string | null>(null);
+  const [isSavingLock, setIsSavingLock] = useState(false);
 
   async function loadProfileData(showRefresh = false) {
     if (!token) {
@@ -217,9 +232,127 @@ export default function ProfileScreen() {
     loadProfileData();
   }, [token]);
 
+  const diaryItems = useMemo<SettingRow[]>(
+    () => [
+      {
+        icon: "lock-closed",
+        iconColor: "#F59E0B",
+        label: "App Lock",
+        value: profile?.appLockEnabled
+          ? profile?.appLockType === "pin"
+            ? "PIN Enabled"
+            : "Password Enabled"
+          : "Off",
+        valueColor: profile?.appLockEnabled ? "#10B981" : "#9CA3AF",
+      },
+      {
+        icon: "shield-checkmark",
+        iconColor: "#3B82F6",
+        label: "Data Security",
+        value: "Encrypted",
+        valueColor: "#3B82F6",
+      },
+    ],
+    [profile?.appLockEnabled, profile?.appLockType]
+  );
+
+  const diaryPrefs = useMemo<SettingRow[]>(
+    () =>
+      DIARY_PREFS.map((item) =>
+        item.label === "App Theme"
+          ? {
+              ...item,
+              value: THEME_LABELS[themeId],
+              valueColor: theme.primary,
+            }
+          : item
+      ),
+    [theme.primary, themeId]
+  );
+
   async function handleLogout() {
     await logout();
     router.replace("/(auth)/login");
+  }
+
+  async function handleSaveLock() {
+    const normalizedValue = lockType === "pin" ? lockValue.trim() : lockValue;
+    const normalizedConfirm = lockType === "pin" ? lockConfirmValue.trim() : lockConfirmValue;
+
+    if (!normalizedValue || !normalizedConfirm) {
+      setLockError("Please complete both fields.");
+      return;
+    }
+
+    if (normalizedValue !== normalizedConfirm) {
+      setLockError("The values do not match.");
+      return;
+    }
+
+    if (lockType === "pin" && !/^\d{4}$/.test(normalizedValue)) {
+      setLockError("PIN must be exactly 4 digits.");
+      return;
+    }
+
+    if (lockType === "password" && normalizedValue.length < 6) {
+      setLockError("App password must be at least 6 characters.");
+      return;
+    }
+
+    try {
+      setIsSavingLock(true);
+      setLockError(null);
+      await setupAppLock(lockType, normalizedValue);
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              appLockEnabled: true,
+              appLockType: lockType,
+            }
+          : current
+      );
+      setIsLockModalVisible(false);
+      setLockValue("");
+      setLockConfirmValue("");
+    } catch (err) {
+      setLockError(err instanceof Error ? err.message : "Failed to save app lock.");
+    } finally {
+      setIsSavingLock(false);
+    }
+  }
+
+  async function handleDisableLock() {
+    try {
+      setIsSavingLock(true);
+      setLockError(null);
+      await disableAppLock();
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              appLockEnabled: false,
+              appLockType: null,
+            }
+          : current
+      );
+      setIsLockModalVisible(false);
+      setLockValue("");
+      setLockConfirmValue("");
+    } catch (err) {
+      setLockError(err instanceof Error ? err.message : "Failed to disable app lock.");
+    } finally {
+      setIsSavingLock(false);
+    }
+  }
+
+  async function handleThemeSelect(nextThemeId: ThemeId) {
+    try {
+      await setThemeId(nextThemeId);
+      setIsThemeModalVisible(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update theme.");
+    }
   }
 
   const stats = useMemo(
@@ -241,7 +374,7 @@ export default function ProfileScreen() {
       <StatusBar barStyle="light-content" />
 
       <LinearGradient
-        colors={["#3B82F6", "#2563EB", "#1D4ED8"]}
+        colors={theme.gradient}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -265,12 +398,12 @@ export default function ProfileScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={() => loadProfileData(true)}
-            tintColor="#3B82F6"
+            tintColor={theme.primary}
           />
         }
       >
         <LinearGradient
-          colors={["#3B82F6", "#6366F1", "#7C3AED"]}
+          colors={[theme.primary, theme.primaryDark, theme.primary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.profileCard}
@@ -311,20 +444,26 @@ export default function ProfileScreen() {
 
         <Text style={styles.sectionLabel}>DIARY PREFERENCES</Text>
         <View style={styles.sectionCard}>
-          {DIARY_PREFS.map((item, i) => (
+          {diaryPrefs.map((item, i) => (
             <View key={i}>
-              <SettingItem item={item} />
-              {i < DIARY_PREFS.length - 1 && <View style={styles.divider} />}
+              <SettingItem
+                item={item}
+                onPress={item.label === "App Theme" ? () => setIsThemeModalVisible(true) : undefined}
+              />
+              {i < diaryPrefs.length - 1 && <View style={styles.divider} />}
             </View>
           ))}
         </View>
 
         <Text style={styles.sectionLabel}>PRIVACY & SECURITY</Text>
         <View style={styles.sectionCard}>
-          {PRIVACY.map((item, i) => (
+          {diaryItems.map((item, i) => (
             <View key={i}>
-              <SettingItem item={item} />
-              {i < PRIVACY.length - 1 && <View style={styles.divider} />}
+              <SettingItem
+                item={item}
+                onPress={item.label === "App Lock" ? () => setIsLockModalVisible(true) : undefined}
+              />
+              {i < diaryItems.length - 1 && <View style={styles.divider} />}
             </View>
           ))}
         </View>
@@ -344,10 +483,146 @@ export default function ProfileScreen() {
           onPress={handleLogout}
           activeOpacity={0.8}
         >
-          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+          <Ionicons name="log-out-outline" size={20} color={theme.danger} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={isThemeModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsThemeModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Choose Theme</Text>
+              <TouchableOpacity onPress={() => setIsThemeModalVisible(false)} activeOpacity={0.7}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>Pick a color mood for the whole app.</Text>
+
+            <View style={styles.themeGrid}>
+              {THEMES.map((item) => {
+                const selected = item.id === themeId;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.themeCard, selected && styles.themeCardActive]}
+                    onPress={() => handleThemeSelect(item.id)}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient colors={item.gradient} style={styles.themeSwatch} />
+                    <Text style={styles.themeName}>{item.name}</Text>
+                    <Text style={styles.themeLabel}>{selected ? "Selected" : "Tap to apply"}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isLockModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsLockModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>App Lock</Text>
+              <TouchableOpacity onPress={() => setIsLockModalVisible(false)} activeOpacity={0.7}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Set a unique {lockType === "pin" ? "PIN" : "password"} for this user account.
+            </Text>
+
+            <View style={styles.toggleRow}>
+              {(["pin", "password"] as const).map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.toggleButton, lockType === type && styles.toggleButtonActive]}
+                  onPress={() => {
+                    setLockType(type);
+                    setLockValue("");
+                    setLockConfirmValue("");
+                    setLockError(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[styles.toggleLabel, lockType === type && styles.toggleLabelActive]}
+                  >
+                    {type === "pin" ? "PIN" : "Password"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              value={lockValue}
+              onChangeText={(value) => {
+                setLockValue(value);
+                if (lockError) setLockError(null);
+              }}
+              placeholder={lockType === "pin" ? "Enter 4-digit PIN" : "Create app password"}
+              placeholderTextColor="#94A3B8"
+              secureTextEntry
+              keyboardType={lockType === "pin" ? "number-pad" : "default"}
+              maxLength={lockType === "pin" ? 4 : 32}
+              style={styles.modalInput}
+            />
+
+            <TextInput
+              value={lockConfirmValue}
+              onChangeText={(value) => {
+                setLockConfirmValue(value);
+                if (lockError) setLockError(null);
+              }}
+              placeholder={lockType === "pin" ? "Confirm PIN" : "Confirm app password"}
+              placeholderTextColor="#94A3B8"
+              secureTextEntry
+              keyboardType={lockType === "pin" ? "number-pad" : "default"}
+              maxLength={lockType === "pin" ? 4 : 32}
+              style={styles.modalInput}
+            />
+
+            {lockError ? <Text style={styles.lockErrorText}>{lockError}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.primaryButton, isSavingLock && styles.disabledAction]}
+              onPress={handleSaveLock}
+              disabled={isSavingLock}
+              activeOpacity={0.85}
+            >
+              {isSavingLock ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Save App Lock</Text>
+              )}
+            </TouchableOpacity>
+
+            {profile?.appLockEnabled ? (
+              <TouchableOpacity
+                style={[styles.secondaryButton, isSavingLock && styles.disabledAction]}
+                onPress={handleDisableLock}
+                disabled={isSavingLock}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.secondaryButtonText}>Turn Off App Lock</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -550,5 +825,136 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#EF4444",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.4)",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 20,
+  },
+  themeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 18,
+  },
+  themeCard: {
+    width: "47%",
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  themeCardActive: {
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+  },
+  themeSwatch: {
+    height: 44,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+  themeName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  themeLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#64748B",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  modalSubtitle: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+  },
+  toggleRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 18,
+  },
+  toggleButton: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FAFC",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  toggleButtonActive: {
+    borderColor: "#2563EB",
+    backgroundColor: "#DBEAFE",
+  },
+  toggleLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  toggleLabelActive: {
+    color: "#1D4ED8",
+  },
+  modalInput: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 16,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: "#0F172A",
+  },
+  lockErrorText: {
+    marginTop: 10,
+    fontSize: 13,
+    color: "#DC2626",
+  },
+  primaryButton: {
+    marginTop: 18,
+    backgroundColor: "#2563EB",
+    borderRadius: 16,
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  secondaryButton: {
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  secondaryButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#DC2626",
+  },
+  disabledAction: {
+    opacity: 0.7,
   },
 });

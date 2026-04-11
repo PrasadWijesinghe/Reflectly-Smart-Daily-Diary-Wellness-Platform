@@ -29,15 +29,15 @@ function isExpoTunnelHost(host: string): boolean {
 }
 
 export const getApiUrl = (): string => {
+  // Web browsers run on the same machine as the backend.
+  // Always use localhost on web — never the LAN IP from the env var.
+  if (Platform.OS === "web") {
+    return DEFAULT_API_URL;
+  }
+
   const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envApiUrl) {
     return normalizeApiUrl(envApiUrl);
-  }
-
-  // Web dev runs on the same machine as backend in this project setup.
-  // Prefer localhost to avoid stale LAN IPs from Expo hostUri causing timeouts.
-  if (Platform.OS === "web") {
-    return DEFAULT_API_URL;
   }
 
   const host = getExpoHost();

@@ -4,6 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { AuthProvider } from "../context/AuthContext";
 import { MusicProvider, useMusic } from "../context/MusicContext";
 import { useRouter } from "expo-router";
+import AppLockGate from "../components/AppLockGate";
+import { ThemeProvider } from "../context/ThemeContext";
 import "./global.css";
 
 function GlobalMiniPlayer() {
@@ -69,6 +71,19 @@ export default function RootLayout() {
         <LayoutContent />
       </MusicProvider>
     </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="viewall-diary" />
+          </Stack>
+          <AppLockGate />
+        </>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

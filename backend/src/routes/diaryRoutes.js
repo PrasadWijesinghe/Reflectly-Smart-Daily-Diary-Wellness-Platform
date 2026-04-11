@@ -8,7 +8,9 @@ const {
   getWeekMoods,
   updateEntry,
   deleteEntry,
+  getWeeklyEntries,
 } = require("../controllers/diaryController");
+const { getWeeklyEntries: getWeeklySummary } = require("../controllers/weeklyController");
 const authenticate = require("../middleware/auth");
 
 const router = express.Router();
@@ -20,6 +22,8 @@ router.get("/mood-trend", getMoodTrend);
 router.get("/week-moods", getWeekMoods);
 router.get("/dates", getEntryDates);
 router.post("/", createEntry);
+// Weekly summary endpoint
+router.get("/weekly", getWeeklySummary);
 router.get("/", getEntries);
 router.get("/:id", getEntry);
 router.put("/:id", updateEntry);
