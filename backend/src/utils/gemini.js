@@ -73,4 +73,63 @@ async function generateAISummary(content) {
   }
 }
 
-module.exports = { generateAISummary };
+async function analyzeMoodScore(content) {
+  if (!content || !content.trim()) return 50;
+
+  console.log(`[Gemini] Starting AI mood analysis, content length: ${content.length}`);
+
+  if (!GEMINI_API_KEY) {
+    console.warn("[Gemini] GEMINI_API_KEY not set, defaulting to 50.");
+    return 50;
+  }
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: `Analyze the sentiment of this diary entry and provide a mood score from 0 to 100 (0 = extremely negative/stressed/sad, 100 = extremely positive/happy/peaceful, 50 = neutral). Return only the number, nothing else.\n\nDiary entry:\n${content}`,
+                },
+              ],
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`[Gemini] API error: ${response.status}`);
+      return 50;
+    }
+
+    const data = await response.json();
+    const result = data?.candidates?.[0]?.content?.parts
+      ?.map((part) => part?.text || "")
+      .join("")
+      .trim();
+
+    const score = parseInt(result, 10);
+    if (!isNaN(score)) {
+      console.log(`[Gemini] Success! Mood Score: ${score}`);
+      return Math.min(100, Math.max(0, score));
+    }
+
+    console.warn("[Gemini] Invalid score in API response, defaulting to 50.");
+    return 50;
+  } catch (error) {
+    console.error(`[Gemini] Exception: ${error.message}`);
+    return 50;
+  }
+}
+
+module.exports = { generateAISummary, analyzeMoodScore };

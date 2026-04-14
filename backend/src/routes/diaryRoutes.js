@@ -9,6 +9,7 @@ const {
   updateEntry,
   deleteEntry,
   getWeeklyEntries,
+  getMonthlyMoods,
 } = require("../controllers/diaryController");
 const { getWeeklyEntries: getWeeklySummary } = require("../controllers/weeklyController");
 const authenticate = require("../middleware/auth");
@@ -21,6 +22,7 @@ router.use(authenticate);
 router.get("/mood-trend", getMoodTrend);
 router.get("/week-moods", getWeekMoods);
 router.get("/dates", getEntryDates);
+router.get("/monthly-moods", getMonthlyMoods);
 router.post("/", createEntry);
 // Weekly summary endpoint
 router.get("/weekly", getWeeklySummary);

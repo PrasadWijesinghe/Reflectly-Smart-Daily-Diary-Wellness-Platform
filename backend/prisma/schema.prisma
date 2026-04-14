@@ -1,19 +1,19 @@
 datasource db {
-  provider = "postgresql"
+  provider = "postgresql"
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 model User {
-  id        Int          @id @default(autoincrement())
-  name      String
-  email     String       @unique
-  password  String
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  diaries   DailyDiary[]
+  id        Int          @id @default(autoincrement())
+  name      String
+  email     String       @unique
+  password  String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  diaries   DailyDiary[]
 }
 
 model DailyDiary {
@@ -21,6 +21,7 @@ model DailyDiary {
   date      DateTime
   content   String
   summary   String
+  moodScore Int      @default(50) // (50 = Neutral)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   userId    Int
@@ -31,36 +32,36 @@ model DailyDiary {
 }
 
 model Tag {
-  id      Int           @id @default(autoincrement())
-  name    String        @unique
-  icon    String
-  color   String
-  diaries DailyDiary[]
+  id      Int           @id @default(autoincrement())
+  name    String        @unique
+  icon    String
+  color   String
+  diaries DailyDiary[]
 }
 
 model Feedback {
-  id        Int      @id @default(autoincrement())
-  message   String
-  createdAt DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  message   String
+  createdAt DateTime @default(now())
 }
 
 model WeeklySummary {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  year        Int
-  month       Int
-  weekNumber  Int
-  weekStart   DateTime
-  weekEnd     DateTime
-  dayCount    Int
-  shortSummary String  @db.Text
-  fullSummary String  @db.Text
-  topTags     String   @db.Text
-  mood        String
-  entryCount  Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  year        Int
+  month       Int
+  weekNumber  Int
+  weekStart   DateTime
+  weekEnd     DateTime
+  dayCount    Int
+  shortSummary String  @db.Text
+  fullSummary String  @db.Text
+  topTags     String   @db.Text
+  mood        String
+  entryCount  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@unique([userId, year, month, weekNumber])
-  @@index([userId])
+  @@unique([userId, year, month, weekNumber])
+  @@index([userId])
 }

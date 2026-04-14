@@ -60,28 +60,18 @@ function LayoutContent() {
         <Stack.Screen name="music" />
       </Stack>
       <GlobalMiniPlayer />
+      <AppLockGate />
     </>
   );
 }
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <MusicProvider>
-        <LayoutContent />
-      </MusicProvider>
-    </AuthProvider>
     <ThemeProvider>
       <AuthProvider>
-        <>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="viewall-diary" />
-          </Stack>
-          <AppLockGate />
-        </>
+        <MusicProvider>
+          <LayoutContent />
+        </MusicProvider>
       </AuthProvider>
     </ThemeProvider>
   );

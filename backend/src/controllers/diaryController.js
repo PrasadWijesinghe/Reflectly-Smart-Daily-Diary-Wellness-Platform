@@ -4,7 +4,7 @@ const {
   incrementDiaryEntriesUpdated,
   incrementDiaryEntriesDeleted,
 } = require("../utils/metrics");
-const { generateAISummary } = require("../utils/gemini");
+const { generateAISummary, analyzeMoodScore } = require("../utils/gemini");
 const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
 
 function generateSummary(content) {
@@ -354,6 +354,11 @@ async function createEntry(req, res) {
     console.log(`[AI Summary] Generating summary for user ${req.user.userId}, date ${normalizedDate}`);
     const summary = await generateAISummary(content);
     console.log(`[AI Summary] Generated: "${summary}"`);
+
+    console.log(`[AI Mood] Analyzing mood for user ${req.user.userId}`);
+    const moodScore = await analyzeMoodScore(content);
+    console.log(`[AI Mood] Result: ${moodScore}`);
+
     const tagConnect =
       tagIds && tagIds.length > 0
         ? { connect: tagIds.map((id) => ({ id })) }
@@ -376,6 +381,7 @@ async function createEntry(req, res) {
       data: {
         content,
         summary,
+        moodScore,
         date: normalizedDate,
         userId: req.user.userId,
         ...(tagConnect && { tags: tagConnect }),
@@ -433,6 +439,10 @@ async function updateEntry(req, res) {
       console.log(`[AI Summary] Generating summary for entry ${existing.id}, user ${req.user.userId}`);
       updateData.summary = await generateAISummary(content);
       console.log(`[AI Summary] Generated: "${updateData.summary}"`);
+      
+      console.log(`[AI Mood] Analyzing mood for entry ${existing.id}`);
+      updateData.moodScore = await analyzeMoodScore(content);
+      console.log(`[AI Mood] Result: ${updateData.moodScore}`);
     }
     if (tagIds !== undefined) {
       updateData.tags = {
@@ -451,6 +461,43 @@ async function updateEntry(req, res) {
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
     console.error("UpdateEntry error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+}
+
+async function getMonthlyMoods(req, res) {
+  try {
+    const { year, month } = req.query;
+
+    if (!year || !month) {
+      return res.status(400).json({ error: "Year and month are required." });
+    }
+
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+
+    const start = new Date(Date.UTC(y, m - 1, 1));
+    const end = new Date(Date.UTC(y, m, 1));
+
+    const entries = await prisma.dailyDiary.findMany({
+      where: {
+        userId: req.user.userId,
+        date: { gte: start, lt: end },
+      },
+      orderBy: { date: "asc" },
+    });
+
+    const moods = entries.map((entry) => ({
+      date: new Date(entry.date).toISOString().split("T")[0],
+      moodScore: entry.moodScore,
+      moodEmoji: getMoodEmoji(entry),
+      summary: entry.summary,
+      id: entry.id,
+    }));
+
+    res.json({ month: `${y}-${String(m).padStart(2, "0")}`, moods });
+  } catch (err) {
+    console.error("GetMonthlyMoods error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 }
@@ -484,5 +531,6 @@ module.exports = {
   getEntryDates,
   getMoodTrend,
   getWeekMoods,
+  getMonthlyMoods,
   updateEntry,
 };
