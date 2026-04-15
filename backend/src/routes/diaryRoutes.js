@@ -23,6 +23,7 @@ router.get("/mood-trend", getMoodTrend);
 router.get("/week-moods", getWeekMoods);
 router.get("/dates", getEntryDates);
 router.get("/monthly-moods", getMonthlyMoods);
+router.get("/emotional-cloud", require("../controllers/diaryController").getEmotionalCloud);
 router.post("/", createEntry);
 // Weekly summary endpoint
 router.get("/weekly", getWeeklySummary);

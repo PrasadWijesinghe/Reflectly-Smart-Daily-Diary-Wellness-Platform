@@ -132,4 +132,98 @@ async function analyzeMoodScore(content) {
   }
 }
 
-module.exports = { generateAISummary, analyzeMoodScore };
+async function analyzeEmotionalCloud(entriesText) {
+  if (!entriesText || !entriesText.trim()) {
+    return { words: [], aiInsight: "No entries found for this period." };
+  }
+
+  console.log(`[Gemini] Starting Emotional Word Cloud analysis, text length: ${entriesText.length}`);
+
+  if (!GEMINI_API_KEY) {
+    console.warn("[Gemini] GEMINI_API_KEY not set, returning empty analysis.");
+    return { words: [], aiInsight: "AI analysis is currently unavailable." };
+  }
+
+  // 💡 මෙන්න විසඳුම! ඔයාගේ අනිත් Functions වලට වැඩ කරන Model එකම (GEMINI_MODEL) මෙතනටත් පාවිච්චි කරනවා.
+  const CLOUD_MODEL = GEMINI_MODEL;
+
+  try {
+    const prompt = `
+      You are an expert psychological sentiment analyzer. 
+      Read the following combined text from a user's monthly diary entries.
+      
+      Your tasks:
+      1. Identify the top 8-12 emotional keywords. (CRITICAL: These MUST be SINGLE WORDS ONLY. Do not use phrases like "Academic Learning", just use "Learning").
+      2. Estimate the number of entries (value) each word appeared in.
+      3. Categorize the sentiment of each word as strictly "positive", "negative", or "neutral".
+      4. Provide a 1-sentence personalized reason (aiReason) why this word was significant.
+      5. Provide a VERY SHORT, punchy 1-sentence overall insight (aiInsight) for the whole month. (Maximum 10-15 words).
+
+      DIARY TEXT:
+      "${entriesText}"
+
+      CRITICAL INSTRUCTION:
+      Respond ONLY with a valid JSON object. Do NOT include any conversational text.
+      The JSON must strictly follow this exact schema:
+      {
+        "aiInsight": "Your short insight here.",
+        "words": [
+          {
+            "text": "SingleWord",
+            "value": 5,
+            "sentiment": "positive",
+            "aiReason": "Your reason here."
+          }
+        ]
+      }
+    `;
+
+    // 💡 encodeURIComponent එක දාලා URL එක හැදුවා (අනිත් ඒවගේ වගේම)
+    const fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(CLOUD_MODEL)}:generateContent?key=${GEMINI_API_KEY}`;
+
+    const response = await fetch(fetchUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Gemini] Emotional Cloud API error (${response.status}):\n`, errorText);
+      return { words: [], aiInsight: "Failed to connect to AI service." };
+    }
+
+    const data = await response.json();
+    let resultText = data?.candidates?.[0]?.content?.parts
+      ?.map((part) => part?.text || "")
+      .join("")
+      .trim();
+
+    if (resultText.startsWith("```json")) {
+      resultText = resultText.replace(/^```json/, "").replace(/```$/, "").trim();
+    } else if (resultText.startsWith("```")) {
+      resultText = resultText.replace(/^```/, "").replace(/```$/, "").trim();
+    }
+
+    const parsed = JSON.parse(resultText);
+    console.log(`[Gemini] Success! Extracted ${parsed?.words?.length || 0} emotional words.`);
+    return parsed;
+  } catch (error) {
+    console.error("[Gemini] Error analyzing emotional cloud:", error.message || error);
+    return { words: [], aiInsight: "Error processing AI results." };
+  }
+}
+
+module.exports = { generateAISummary, analyzeMoodScore, analyzeEmotionalCloud };

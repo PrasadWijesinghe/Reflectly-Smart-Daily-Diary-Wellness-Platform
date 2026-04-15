@@ -4,7 +4,7 @@ const {
   incrementDiaryEntriesUpdated,
   incrementDiaryEntriesDeleted,
 } = require("../utils/metrics");
-const { generateAISummary, analyzeMoodScore } = require("../utils/gemini");
+const { generateAISummary, analyzeMoodScore, analyzeEmotionalCloud } = require("../utils/gemini");
 const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
 
 function generateSummary(content) {
@@ -502,6 +502,58 @@ async function getMonthlyMoods(req, res) {
   }
 }
 
+async function getEmotionalCloud(req, res) {
+  try {
+    const { year, month } = req.query;
+
+    if (!year || !month) {
+      return res.status(400).json({ error: "Year and month are required." });
+    }
+
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+
+    const start = new Date(Date.UTC(y, m - 1, 1));
+    const end = new Date(Date.UTC(y, m, 1));
+
+    console.log(`[Emotional Cloud] Fetching entries for user ${req.user.userId}, ${y}-${m}`);
+
+    const entries = await prisma.dailyDiary.findMany({
+      where: {
+        userId: req.user.userId,
+        date: { gte: start, lt: end },
+      },
+      select: {
+        content: true,
+        summary: true,
+      },
+    });
+
+    if (entries.length === 0) {
+      return res.json({
+        month: `${y}-${String(m).padStart(2, "0")}`,
+        words: [],
+        aiInsight: "You haven't written any diary entries this month yet. Start writing to see your emotional patterns! 🖋️",
+      });
+    }
+
+    // Combine all entries into one text block for AI analysis
+    const entriesText = entries
+      .map((e) => `${e.summary || ""} ${e.content || ""}`)
+      .join("\n\n---\n\n");
+
+    const analysis = await analyzeEmotionalCloud(entriesText);
+
+    res.json({
+      month: `${y}-${String(m).padStart(2, "0")}`,
+      ...analysis,
+    });
+  } catch (err) {
+    console.error("GetEmotionalCloud error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+}
+
 async function deleteEntry(req, res) {
   try {
     const existing = await prisma.dailyDiary.findFirst({
@@ -532,5 +584,6 @@ module.exports = {
   getMoodTrend,
   getWeekMoods,
   getMonthlyMoods,
+  getEmotionalCloud,
   updateEntry,
 };

@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { getApiUrl } from "../../utils/api";
 import MoodHeatmap from "../../components/MoodHeatmap";
+import EmotionalWordCloud from "../../components/EmotionalWordCloud";
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const EMPTY_MOODS: Record<string, string> = { Mon: "—", Tue: "—", Wed: "—", Thu: "—", Fri: "—", Sat: "—", Sun: "—" };
 const EMPTY_STRESS: Record<string, number> = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
@@ -299,6 +300,7 @@ export default function InsightsScreen() {
         {activeTab === "30days" && (
           <View style={{ marginTop: 20 }}>
             <MoodHeatmap />
+            <EmotionalWordCloud />
           </View>
         )}
 
