@@ -4,7 +4,15 @@ const {
   incrementDiaryEntriesUpdated,
   incrementDiaryEntriesDeleted,
 } = require("../utils/metrics");
-const { generateAISummary, analyzeMoodScore, analyzeEmotionalCloud } = require("../utils/gemini");
+const {
+  generateAISummary,
+  analyzeMoodScore,
+  analyzeEmotionalCloud,
+  generateAIInsightsPanel,
+  getCachedInsightsPanel,
+  setCachedInsightsPanel,
+  invalidateInsightsPanelCache,
+} = require("../utils/gemini");
 const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
 
 function generateSummary(content) {
@@ -95,6 +103,189 @@ function getStressLabel(percentage) {
   if (percentage >= 40) return "Moderate";
   if (percentage > 0) return "Light";
   return "No data";
+}
+
+function getInsightStressScore(entry) {
+  const content = `${entry.content || ""} ${entry.summary || ""}`.toLowerCase();
+
+  if (
+    content.includes("anxious") ||
+    content.includes("stress") ||
+    content.includes("overwhelmed") ||
+    content.includes("panic") ||
+    content.includes("burnout")
+  ) {
+    return 85;
+  }
+  if (
+    content.includes("sad") ||
+    content.includes("frustrated") ||
+    content.includes("angry") ||
+    content.includes("tired")
+  ) {
+    return 60;
+  }
+  if (
+    content.includes("calm") ||
+    content.includes("peaceful") ||
+    content.includes("relaxed") ||
+    content.includes("grateful") ||
+    content.includes("hopeful")
+  ) {
+    return 20;
+  }
+  if (entry.content) {
+    return 35;
+  }
+
+  return 0;
+}
+
+function formatInsightDay(date) {
+  return new Date(date).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function buildInsightsContext(entries, days) {
+  const moodScores = entries
+    .map((entry) => (typeof entry.moodScore === "number" ? entry.moodScore : 50))
+    .filter((value) => Number.isFinite(value));
+
+  const stressScores = entries
+    .map((entry) => getInsightStressScore(entry))
+    .filter((value) => value > 0);
+
+  const averageMood = moodScores.length
+    ? Math.round(moodScores.reduce((sum, value) => sum + value, 0) / moodScores.length)
+    : 0;
+
+  const averageStress = stressScores.length
+    ? Math.round(stressScores.reduce((sum, value) => sum + value, 0) / stressScores.length)
+    : 0;
+
+  const positiveDays = moodScores.filter((value) => value >= 65).length;
+  const negativeDays = moodScores.filter((value) => value <= 35).length;
+  const neutralDays = Math.max(entries.length - positiveDays - negativeDays, 0);
+
+  const topicCounts = {};
+  entries.forEach((entry) => {
+    (entry.tags || []).forEach((tag) => {
+      topicCounts[tag.name] = (topicCounts[tag.name] || 0) + 1;
+    });
+  });
+
+  const topTopics = Object.entries(topicCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([label, count]) => ({ label, count }));
+
+  const datedEntries = entries.map((entry) => ({
+    ...entry,
+    dateObj: new Date(entry.date),
+    moodScoreValue: typeof entry.moodScore === "number" ? entry.moodScore : 50,
+  }));
+
+  const bestEntry = datedEntries.reduce((best, entry) => {
+    if (!best || entry.moodScoreValue > best.moodScoreValue) return entry;
+    return best;
+  }, null);
+
+  const worstEntry = datedEntries.reduce((worst, entry) => {
+    if (!worst || entry.moodScoreValue < worst.moodScoreValue) return entry;
+    return worst;
+  }, null);
+
+  const entrySamples = datedEntries.slice(-8).map((entry) => ({
+    date: entry.dateObj.toISOString().split("T")[0],
+    dayLabel: formatInsightDay(entry.dateObj),
+    moodScore: entry.moodScoreValue,
+    summary: entry.summary || (entry.content || "").slice(0, 120),
+    tags: (entry.tags || []).map((tag) => tag.name).slice(0, 4),
+  }));
+
+  return {
+    cacheKey: `user:${entries[0]?.userId || "unknown"}:days:${days}`,
+    periodDays: days,
+    periodLabel: `last ${days} days`,
+    entryCount: entries.length,
+    averageMood,
+    averageStress,
+    positiveDays,
+    negativeDays,
+    neutralDays,
+    topTopics,
+    bestDay: bestEntry
+      ? {
+          date: bestEntry.dateObj.toISOString().split("T")[0],
+          dayLabel: formatInsightDay(bestEntry.dateObj),
+          moodScore: bestEntry.moodScoreValue,
+          summary: bestEntry.summary || (bestEntry.content || "").slice(0, 120),
+        }
+      : null,
+    worstDay: worstEntry
+      ? {
+          date: worstEntry.dateObj.toISOString().split("T")[0],
+          dayLabel: formatInsightDay(worstEntry.dateObj),
+          moodScore: worstEntry.moodScoreValue,
+          summary: worstEntry.summary || (worstEntry.content || "").slice(0, 120),
+        }
+      : null,
+    sampleEntries: entrySamples,
+  };
+}
+
+function buildInsightsRange(days) {
+  const end = new Date();
+  end.setUTCHours(23, 59, 59, 999);
+
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  start.setUTCHours(0, 0, 0, 0);
+
+  return { start, end };
+}
+
+async function getAiInsights(req, res) {
+  try {
+    const requestedDays = Number.parseInt(req.query.days, 10);
+    const days = requestedDays === 30 ? 30 : 7;
+    const { start, end } = buildInsightsRange(days);
+    const cacheKey = `insights:${req.user.userId}:${days}`;
+
+    const cached = getCachedInsightsPanel(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const entries = await prisma.dailyDiary.findMany({
+      where: {
+        userId: req.user.userId,
+        date: { gte: start, lte: end },
+      },
+      orderBy: { date: "asc" },
+      include: { tags: true },
+    });
+
+    const context = buildInsightsContext(entries, days);
+    const insights = await generateAIInsightsPanel(context);
+    const payload = {
+      ...insights,
+      periodLabel: context.periodLabel,
+      entryCount: context.entryCount,
+      averageMood: context.averageMood,
+      averageStress: context.averageStress,
+    };
+
+    setCachedInsightsPanel(cacheKey, payload);
+    res.json(payload);
+  } catch (err) {
+    console.error("GetAiInsights error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
 }
 
 function buildWeeklySuggestions(stressPercentage, hasEntries, hasHighStressEntry) {
@@ -390,6 +581,7 @@ async function createEntry(req, res) {
     });
 
     incrementDiaryEntriesCreated();
+    invalidateInsightsPanelCache(`insights:${req.user.userId}:`);
     await regenerateWeekSummary(req.user.userId, normalizedDate);
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {
@@ -457,6 +649,7 @@ async function updateEntry(req, res) {
     });
 
     incrementDiaryEntriesUpdated();
+    invalidateInsightsPanelCache(`insights:${req.user.userId}:`);
     await regenerateWeekSummary(req.user.userId, existing.date);
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
@@ -567,6 +760,7 @@ async function deleteEntry(req, res) {
     await prisma.dailyDiary.delete({ where: { id: existing.id } });
 
     incrementDiaryEntriesDeleted();
+    invalidateInsightsPanelCache(`insights:${req.user.userId}:`);
     await regenerateWeekSummary(req.user.userId, existing.date);
     res.json({ message: "Entry deleted." });
   } catch (err) {
@@ -585,5 +779,6 @@ module.exports = {
   getWeekMoods,
   getMonthlyMoods,
   getEmotionalCloud,
+  getAiInsights,
   updateEntry,
 };

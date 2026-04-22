@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Modal, Pressable } from 'react-native';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../utils/api';
+import ShimmerSkeleton from './ShimmerSkeleton';
 
 // --- Types ---
 interface Word {
@@ -23,6 +26,47 @@ interface Props {
 }
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const WordChip: React.FC<{
+    word: Word;
+    fontSize: number;
+    color: string;
+    opacity: number;
+    onPress: () => void;
+}> = ({ word, fontSize, color, opacity, onPress }) => {
+    const scale = useSharedValue(1);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+    }));
+
+    return (
+        <AnimatedPressable
+            onPress={onPress}
+            onPressIn={() => {
+                scale.value = withSpring(1.08, { damping: 12, stiffness: 260 });
+            }}
+            onPressOut={() => {
+                scale.value = withSpring(1, { damping: 12, stiffness: 260 });
+            }}
+            style={[{ margin: 6 }, animatedStyle]}
+        >
+            <Text
+                style={[
+                    styles.wordText,
+                    {
+                        fontSize,
+                        color,
+                        opacity,
+                    },
+                ]}
+            >
+                {word.text}
+            </Text>
+        </AnimatedPressable>
+    );
+};
 
 const EmotionalWordCloud: React.FC<Props> = ({ selectedMonth }) => {
     const [data, setData] = useState<WordCloudData | null>(null);
@@ -117,36 +161,40 @@ const EmotionalWordCloud: React.FC<Props> = ({ selectedMonth }) => {
             {/* --- Word Cloud --- */}
             <View style={[styles.cloudContainer, { minHeight: width * 0.5 }]}>
                 {loading ? (
-                    <ActivityIndicator size="large" color="#10B981" />
+                    <View style={styles.skeletonCloud}>
+                        <View style={styles.skeletonCloudRow}>
+                            <ShimmerSkeleton width={78} height={30} />
+                            <ShimmerSkeleton width={96} height={26} />
+                            <ShimmerSkeleton width={62} height={30} />
+                        </View>
+                        <View style={styles.skeletonCloudRow}>
+                            <ShimmerSkeleton width={112} height={34} />
+                            <ShimmerSkeleton width={74} height={28} />
+                        </View>
+                        <View style={styles.skeletonCloudRow}>
+                            <ShimmerSkeleton width={90} height={28} />
+                            <ShimmerSkeleton width={120} height={36} />
+                            <ShimmerSkeleton width={66} height={26} />
+                        </View>
+                        <Text style={styles.skeletonCloudText}>Generating your emotional word cloud...</Text>
+                    </View>
                 ) : data?.words && data.words.length > 0 ? (
                     <View style={styles.wordsWrapper}>
             {data.words.map((word, i) => {
-              // 💡 මෙන්න වෙනස: 
-              // Base size 16. Value එක 4න් ගුණ කරනවා. 
-              // හැබැයි මොනවා වුණත් උපරිම සයිස් එක 38 ට වඩා වැඩි වෙන්න දෙන්නේ නෑ (Math.min පාවිච්චි කරලා).
-              const computedFontSize = Math.min(38, 16 + (word.value * 4)); 
-              
+              const computedFontSize = Math.min(38, 16 + (word.value * 4));
+
               return (
-                <TouchableOpacity 
-                  key={i} 
-                  onPress={() => setSelectedWord(word)} 
-                  activeOpacity={0.6}
-                  style={{ margin: 6 }} 
-                >
-                  <Text 
-                    style={[
-                      styles.wordText, 
-                      { 
-                        fontSize: computedFontSize, 
-                        color: getColor(word.sentiment), 
-                        // 💡 Opacity එකත් හැදුවා (වතාවක් දෙකක් ආපු ඒවත් පැහැදිලිව පේන්න)
-                        opacity: word.value > 1 ? 1 : 0.75,
-                      }
-                    ]}
-                  >
-                    {word.text}
-                  </Text>
-                </TouchableOpacity>
+                <WordChip
+                  key={`${word.text}-${i}`}
+                  word={word}
+                  fontSize={computedFontSize}
+                  color={getColor(word.sentiment)}
+                  opacity={word.value > 1 ? 1 : 0.75}
+                  onPress={async () => {
+                    await Haptics.selectionAsync().catch(() => {});
+                    setSelectedWord(word);
+                  }}
+                />
               );
             })}
           </View>
@@ -315,6 +363,24 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         textAlign: 'center',
         letterSpacing: -0.5,
+    },
+    skeletonCloud: {
+        width: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+    },
+    skeletonCloudRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        gap: 10,
+    },
+    skeletonCloudText: {
+        marginTop: 6,
+        color: '#9CA3AF',
+        fontSize: 12,
+        fontWeight: '600',
     },
     legendContainer: {
         flexDirection: 'row',

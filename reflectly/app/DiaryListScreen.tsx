@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../utils/api';
+import DiaryStateLottie from '../components/DiaryStateLottie';
 
 export default function DiaryListScreen() {
   const router = useRouter();
@@ -128,8 +129,13 @@ export default function DiaryListScreen() {
 
       {loading ? (
         <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
-          <Text style={{ color: '#6B7280', marginTop: 12 }}>Loading entries...</Text>
+          <DiaryStateLottie
+            variant="loading"
+            title="Loading entries"
+            subtitle="We are fetching your diary entries."
+            size={180}
+            tone="blue"
+          />
         </View>
       ) : (
         <FlatList
@@ -140,8 +146,20 @@ export default function DiaryListScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>📭</Text>
-              <Text style={styles.emptyText}>No entries found for "{keyword}"</Text>
+              <DiaryStateLottie
+                variant="empty"
+                title="No entries found"
+                subtitle={`We could not find any diary entries for "${keyword}". Try another keyword or write a new note.`}
+                size={220}
+                tone="amber"
+              />
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => router.push("/(tabs)/diary")}
+                style={styles.emptyCta}
+              >
+                <Text style={styles.emptyCtaText}>Write your first diary</Text>
+              </TouchableOpacity>
             </View>
           }
         />
@@ -193,4 +211,20 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
   emptyEmoji: { fontSize: 48, marginBottom: 16 },
   emptyText: { fontSize: 15, color: '#6B7280' },
+  emptyCta: {
+    marginTop: 18,
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 999,
+    shadowColor: '#2563EB',
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  emptyCtaText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

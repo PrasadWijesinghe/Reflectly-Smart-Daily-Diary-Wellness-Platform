@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, useWindowDimensions, ActivityIndicator, Pressable } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useAuth } from '../context/AuthContext';
 import { getApiUrl } from '../utils/api';
 
@@ -39,7 +41,59 @@ const getNoteBgColor = (score: number) => {
   return '#FEF2F2'; 
 };
 
+const getMoodColor = (score: number) => {
+  if (score < 0) return '#F3F4F6'; 
+  if (score >= 80) return '#10B981'; 
+  if (score >= 60) return '#34D399'; 
+  if (score >= 40) return '#FBBF24'; 
+  if (score >= 20) return '#FB923C'; 
+  return '#EF4444'; 
+};
+
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const HeatmapCell: React.FC<{
+  day: HeatmapDay | null;
+  size: number;
+  onPress: () => void;
+}> = ({ day, size, onPress }) => {
+  const scale = useSharedValue(1);
+  const translateY = useSharedValue(0);
+  const isActive = !!day && day.moodScore !== -1;
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }, { translateY: translateY.value }],
+  }));
+
+  return (
+    <AnimatedPressable
+      disabled={!isActive}
+      onPress={onPress}
+      onPressIn={() => {
+        if (!isActive) return;
+        scale.value = withSpring(1.08, { damping: 12, stiffness: 260 });
+        translateY.value = withSpring(-2, { damping: 12, stiffness: 260 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 12, stiffness: 260 });
+        translateY.value = withSpring(0, { damping: 12, stiffness: 260 });
+      }}
+      style={[
+        styles.cell,
+        isActive && styles.cellFilled,
+        animatedStyle,
+        {
+          backgroundColor: day ? getMoodColor(day.moodScore) : 'transparent',
+          width: size,
+          height: size,
+        },
+      ]}
+    >
+      <Text style={styles.cellEmoji}>{day && isActive ? day.moodEmoji : ''}</Text>
+    </AnimatedPressable>
+  );
+};
 
 const MonthlyMoodHeatmap: React.FC<Props> = ({ selectedMonth }) => {
   const [data, setData] = useState<MonthlyHeatmapData | null>(null);
@@ -139,15 +193,6 @@ const MonthlyMoodHeatmap: React.FC<Props> = ({ selectedMonth }) => {
     fetchHeatmapData();
   }, [currentDate, token]);
 
-  const getMoodColor = (score: number) => {
-    if (score < 0) return '#F3F4F6'; 
-    if (score >= 80) return '#10B981'; 
-    if (score >= 60) return '#34D399'; 
-    if (score >= 40) return '#FBBF24'; 
-    if (score >= 20) return '#FB923C'; 
-    return '#EF4444'; 
-  };
-
   const buildGrid = () => {
     if (!data || !data.heatmap || data.heatmap.length === 0) return [];
     const grid: (HeatmapDay | null)[][] = [];
@@ -228,30 +273,18 @@ const MonthlyMoodHeatmap: React.FC<Props> = ({ selectedMonth }) => {
             </View>
             {grid.map((week, wIdx) => (
               <View key={wIdx} style={styles.weekRow}>
-                {week.map((day, dIdx) => {
-                  const bg = day ? getMoodColor(day.moodScore) : 'transparent';
-                  const isCell = day !== null;
-                  const isEmpty = day ? day.moodScore === -1 : false;
-                  
-                  return (
-                    <TouchableOpacity
-                      key={dIdx}
-                      disabled={!day || isEmpty}
-                      onPress={() => day && !isEmpty && setSelectedDay(day)}
-                      style={[
-                        styles.cell, 
-                        isCell && styles.cellFilled, 
-                        { 
-                          backgroundColor: bg,
-                          width: SQUARE_SIZE, 
-                          height: SQUARE_SIZE, 
-                        }
-                      ]}
-                    >
-                      <Text style={styles.cellEmoji}>{day && !isEmpty ? day.moodEmoji : ''}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                {week.map((day, dIdx) => (
+                  <HeatmapCell
+                    key={dIdx}
+                    day={day}
+                    size={SQUARE_SIZE}
+                    onPress={async () => {
+                      if (!day || day.moodScore === -1) return;
+                      await Haptics.selectionAsync().catch(() => {});
+                      setSelectedDay(day);
+                    }}
+                  />
+                ))}
               </View>
             ))}
           </View>
@@ -418,6 +451,11 @@ const styles = StyleSheet.create({
   cellFilled: {
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.05)',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   cellEmoji: {
     fontSize: 14,

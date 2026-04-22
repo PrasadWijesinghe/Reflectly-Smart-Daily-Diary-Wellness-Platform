@@ -10,6 +10,7 @@ const {
   deleteEntry,
   getWeeklyEntries,
   getMonthlyMoods,
+  getAiInsights,
 } = require("../controllers/diaryController");
 const { getWeeklyEntries: getWeeklySummary } = require("../controllers/weeklyController");
 const authenticate = require("../middleware/auth");
@@ -23,6 +24,7 @@ router.get("/mood-trend", getMoodTrend);
 router.get("/week-moods", getWeekMoods);
 router.get("/dates", getEntryDates);
 router.get("/monthly-moods", getMonthlyMoods);
+router.get("/ai-insights", getAiInsights);
 router.get("/emotional-cloud", require("../controllers/diaryController").getEmotionalCloud);
 router.post("/", createEntry);
 // Weekly summary endpoint
