@@ -9,14 +9,18 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useAuth } from "../context/AuthContext";
-import { getApiUrl } from "../utils/api";
+import { getApiUrl, getImageUrl } from "../utils/api";
 import MonthPicker from "../components/MonthPicker";
 import ConfirmModal from "../components/ConfirmModal";
+import ImageThumbnailStrip from "../components/ImageThumbnailStrip";
+import ImagePickerButton from "../components/ImagePickerButton";
+import FullscreenImageViewer from "../components/FullscreenImageViewer";
 
 type Tag = {
   id: number;
@@ -26,12 +30,23 @@ type Tag = {
   count?: number;
 };
 
+type DiaryImage = {
+  id: number;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  order: number;
+  url: string;
+};
+
 type DiaryEntry = {
   id: number;
   date: string;
   content: string;
   summary: string;
   tags: Tag[];
+  images: DiaryImage[];
   createdAt: string;
   updatedAt: string;
 };
@@ -128,6 +143,15 @@ export default function ViewAllDiaryScreen() {
   const [editText, setEditText] = useState("");
   const [editTagIds, setEditTagIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // Inline edit image state
+  const [editSavedImages, setEditSavedImages] = useState<DiaryImage[]>([]);
+  const [editPendingUris, setEditPendingUris] = useState<string[]>([]);
+
+  // Screen-level fullscreen viewer
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerImages, setViewerImages] = useState<string[]>([]);
+  const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
 
   const fetchEntries = useCallback(async () => {
     if (!token) return;
@@ -239,6 +263,8 @@ export default function ViewAllDiaryScreen() {
     setEditingId(entry.id);
     setEditText(entry.content);
     setEditTagIds(entry.tags.map((t) => t.id));
+    setEditSavedImages(entry.images || []);
+    setEditPendingUris([]);
   };
 
   const handleInlineSave = (entryId: number) => {
@@ -262,9 +288,38 @@ export default function ViewAllDiaryScreen() {
         }),
       });
       if (!res.ok) throw new Error("Save failed");
+
+      let uploadedImages: DiaryImage[] = [];
+      if (editPendingUris.length > 0) {
+        const formData = new FormData();
+        for (const uri of editPendingUris) {
+          const filename = uri.split("/").pop() ?? "photo.jpg";
+          const match = /\.(\w+)$/.exec(filename);
+          const mimeType = match ? `image/${match[1]}` : "image/jpeg";
+          formData.append("images", { uri, name: filename, type: mimeType } as any);
+        }
+        const uploadRes = await fetch(`${getApiUrl()}/diary/${updateTargetId}/images`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          uploadedImages = uploadData.images ?? [];
+        }
+      }
+
+      const finalImages = [...editSavedImages, ...uploadedImages];
+      setAllEntries((prev) =>
+        prev.map((e) =>
+          e.id === updateTargetId ? { ...e, content: editText, tags: e.tags, images: finalImages } : e
+        )
+      );
+
       setUpdateTargetId(null);
       setEditingId(null);
-      fetchEntries();
+      setEditSavedImages([]);
+      setEditPendingUris([]);
     } catch (err: any) {
       console.error("Save error:", err);
     } finally {
@@ -276,12 +331,32 @@ export default function ViewAllDiaryScreen() {
     setEditingId(null);
     setEditText("");
     setEditTagIds([]);
+    setEditSavedImages([]);
+    setEditPendingUris([]);
   };
 
   const toggleEditTag = (tagId: number) => {
     setEditTagIds((prev) =>
       prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId]
     );
+  };
+
+  const handleRemoveSaved = async (imageId: number) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${getApiUrl()}/diary/images/${imageId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      setEditSavedImages((prev) => prev.filter((img) => img.id !== imageId));
+    } catch {
+      Alert.alert("Error", "Failed to delete image. Please try again.");
+    }
+  };
+
+  const handleRemovePending = (index: number) => {
+    setEditPendingUris((prev) => prev.filter((_, i) => i !== index));
   };
 
   const entryCount = filteredEntries.length;
@@ -569,6 +644,34 @@ export default function ViewAllDiaryScreen() {
                               );
                             })}
                           </View>
+
+                          {/* Images */}
+                          <ImageThumbnailStrip
+                            images={editSavedImages}
+                            pendingUris={editPendingUris}
+                            editMode
+                            onRemoveSaved={handleRemoveSaved}
+                            onRemovePending={handleRemovePending}
+                            onPress={(index, source) => {
+                              const savedUrls = editSavedImages.map((img) => getImageUrl(img.url));
+                              const allUrls = [...savedUrls, ...editPendingUris];
+                              const realIndex = source === "saved" ? index : editSavedImages.length + index;
+                              setViewerImages(allUrls);
+                              setViewerInitialIndex(realIndex);
+                              setViewerVisible(true);
+                            }}
+                          />
+                          <View style={styles.editPickerRow}>
+                            <ImagePickerButton
+                              maxImages={5 - editSavedImages.length - editPendingUris.length}
+                              onImagesSelected={(uris) =>
+                                setEditPendingUris((prev) => {
+                                  const slots = 5 - editSavedImages.length - prev.length;
+                                  return [...prev, ...uris.slice(0, slots)];
+                                })
+                              }
+                            />
+                          </View>
                         </View>
                       ) : (
                         /* ── View Content ── */
@@ -590,6 +693,19 @@ export default function ViewAllDiaryScreen() {
                               ))}
                             </View>
                           )}
+
+                          {(entry.images?.length ?? 0) > 0 && (
+                            <ImageThumbnailStrip
+                              images={entry.images}
+                              editMode={false}
+                              onPress={(index) => {
+                                const urls = entry.images.map((img) => getImageUrl(img.url));
+                                setViewerImages(urls);
+                                setViewerInitialIndex(index);
+                                setViewerVisible(true);
+                              }}
+                            />
+                          )}
                         </View>
                       )}
 
@@ -608,42 +724,56 @@ export default function ViewAllDiaryScreen() {
                     </View>
                   ) : (
                     /* ──── Collapsed ──── */
-                    <View style={styles.collapsedLayout}>
-                      <View style={styles.collapsedTextBlock}>
-                        <Text style={styles.collapsedSummary} numberOfLines={1}>
-                          {entry.summary}
-                        </Text>
-                        <Text style={styles.collapsedPreview} numberOfLines={2}>
-                          {entry.content}
-                        </Text>
-                        {entry.tags.length > 0 && (
-                          <View style={styles.collapsedTags}>
-                            {entry.tags.map((tag) => (
-                              <View
-                                key={tag.id}
-                                style={[
-                                  styles.collapsedTag,
-                                  { backgroundColor: tag.color + "18" },
-                                ]}
-                              >
-                                <Text
-                                  style={[styles.collapsedTagText, { color: tag.color }]}
+                    <View>
+                      <View style={styles.collapsedLayout}>
+                        <View style={styles.collapsedTextBlock}>
+                          <Text style={styles.collapsedSummary} numberOfLines={1}>
+                            {entry.summary}
+                          </Text>
+                          <Text style={styles.collapsedPreview} numberOfLines={2}>
+                            {entry.content}
+                          </Text>
+                          {entry.tags.length > 0 && (
+                            <View style={styles.collapsedTags}>
+                              {entry.tags.map((tag) => (
+                                <View
+                                  key={tag.id}
+                                  style={[
+                                    styles.collapsedTag,
+                                    { backgroundColor: tag.color + "18" },
+                                  ]}
                                 >
-                                  {tag.icon} {tag.name}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        )}
+                                  <Text
+                                    style={[styles.collapsedTagText, { color: tag.color }]}
+                                  >
+                                    {tag.icon} {tag.name}
+                                  </Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                        <View style={styles.collapsedDateBlock}>
+                          <Text style={[styles.collapsedDayNum, { color: accent }]}>
+                            {d.getDate()}
+                          </Text>
+                          <Text style={styles.collapsedMonth}>
+                            {monthShort[d.getMonth()]}
+                          </Text>
+                        </View>
                       </View>
-                      <View style={styles.collapsedDateBlock}>
-                        <Text style={[styles.collapsedDayNum, { color: accent }]}>
-                          {d.getDate()}
-                        </Text>
-                        <Text style={styles.collapsedMonth}>
-                          {monthShort[d.getMonth()]}
-                        </Text>
-                      </View>
+                      {(entry.images?.length ?? 0) > 0 && (
+                        <ImageThumbnailStrip
+                          images={entry.images}
+                          editMode={false}
+                          onPress={(index) => {
+                            const urls = entry.images.map((img) => getImageUrl(img.url));
+                            setViewerImages(urls);
+                            setViewerInitialIndex(index);
+                            setViewerVisible(true);
+                          }}
+                        />
+                      )}
                     </View>
                   )}
                 </View>
@@ -776,6 +906,14 @@ export default function ViewAllDiaryScreen() {
         type="update"
         onConfirm={confirmUpdate}
         onCancel={() => setUpdateTargetId(null)}
+      />
+
+      {/* Fullscreen Image Viewer */}
+      <FullscreenImageViewer
+        visible={viewerVisible}
+        images={viewerImages}
+        initialIndex={viewerInitialIndex}
+        onClose={() => setViewerVisible(false)}
       />
     </KeyboardAvoidingView>
   );
@@ -1165,6 +1303,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#6B7280",
+  },
+  editPickerRow: {
+    marginTop: 10,
+    marginBottom: 4,
   },
 
   /* ── Weekly View ── */
