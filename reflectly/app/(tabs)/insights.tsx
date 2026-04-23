@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -10,6 +10,7 @@ import MoodHeatmap from "../../components/MoodHeatmap";
 import EmotionalWordCloud from "../../components/EmotionalWordCloud";
 import DiaryStateLottie from "../../components/DiaryStateLottie";
 import ShimmerSkeleton from "../../components/ShimmerSkeleton";
+import ConfettiDrop from "../../components/ConfettiDrop";
 
 type InsightCard = {
   title: string;
@@ -54,6 +55,77 @@ function withOpacity(hexColor: string, opacity: number) {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
+function getCardTheme(card: InsightCard, index: number) {
+  const title = `${card.title} ${card.subtitle}`.toLowerCase();
+  const isStress = /stress|anxious|pressure|overwhelm|worried/.test(title);
+  const isMood = /mood|balance|calm|positive|happy|wellbeing/.test(title);
+  const isCelebrate = /resilience|streak|progress|milestone|celebrat|win/.test(title) || card.color === "#F59E0B";
+
+  if (isCelebrate) {
+    return {
+      backgroundColor: "#FFF7D6",
+      accentColor: "#F59E0B",
+      accentSoft: "#FDE68A",
+      iconBackground: "rgba(245, 158, 11, 0.18)",
+      titleColor: "#1F2937",
+      subColor: "#6B7280",
+      topStrip: "#FBBF24",
+      shadowColor: "#F59E0B",
+    };
+  }
+
+  if (isStress) {
+    return {
+      backgroundColor: "#FFF1F2",
+      accentColor: "#EF4444",
+      accentSoft: "#FECACA",
+      iconBackground: "rgba(239, 68, 68, 0.14)",
+      titleColor: "#1F2937",
+      subColor: "#6B7280",
+      topStrip: "#FCA5A5",
+      shadowColor: "#EF4444",
+    };
+  }
+
+  if (isMood) {
+    return {
+      backgroundColor: "#EEF8FF",
+      accentColor: "#10B981",
+      accentSoft: "#D1FAE5",
+      iconBackground: "rgba(16, 185, 129, 0.14)",
+      titleColor: "#1F2937",
+      subColor: "#6B7280",
+      topStrip: "#93C5FD",
+      shadowColor: "#3B82F6",
+    };
+  }
+
+  const palette = [
+    {
+      backgroundColor: "#FFF7E8",
+      accentColor: "#3B82F6",
+      accentSoft: "#DBEAFE",
+      iconBackground: "rgba(59, 130, 246, 0.14)",
+      titleColor: "#1F2937",
+      subColor: "#6B7280",
+      topStrip: "#BFDBFE",
+      shadowColor: "#3B82F6",
+    },
+    {
+      backgroundColor: "#F4F7FF",
+      accentColor: "#8B5CF6",
+      accentSoft: "#EDE9FE",
+      iconBackground: "rgba(139, 92, 246, 0.14)",
+      titleColor: "#1F2937",
+      subColor: "#6B7280",
+      topStrip: "#C4B5FD",
+      shadowColor: "#8B5CF6",
+    },
+  ];
+
+  return palette[index % palette.length];
+}
+
 export default function InsightsScreen() {
   const router = useRouter();
   const { token } = useAuth();
@@ -68,6 +140,7 @@ export default function InsightsScreen() {
   const [aiInsights, setAiInsights] = useState<InsightPanel | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiReadyFlash, setAiReadyFlash] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   React.useEffect(() => {
     if (!token) return;
@@ -267,7 +340,38 @@ export default function InsightsScreen() {
     };
   }, [activeTab, token]);
 
-  const insightCards: InsightCard[] =
+  useEffect(() => {
+    if (!aiInsights) {
+      setShowConfetti(false);
+      return;
+    }
+
+    const joinedText = [
+      aiInsights.summary,
+      ...(aiInsights.cards || []).map((card) => `${card.title} ${card.subtitle}`),
+      ...(aiInsights.tips || []).map((tip) => `${tip.title} ${tip.subtitle}`),
+    ].join(" ");
+
+    const celebrate = /resilience|streak|progress|milestone|consisten|win|celebrat/i.test(joinedText);
+    if (!celebrate) {
+      setShowConfetti(false);
+      return;
+    }
+
+    setShowConfetti(true);
+    const timer = setTimeout(() => setShowConfetti(false), 3200);
+    return () => clearTimeout(timer);
+  }, [aiInsights]);
+
+  const celebrationSignal = aiInsights
+    ? [
+        aiInsights.summary,
+        ...(aiInsights.cards || []).map((card) => `${card.title} ${card.subtitle}`),
+      ].join(" ")
+    : "";
+  const isCelebrationReady = /resilience|streak|progress|milestone|consisten|win|celebrat/i.test(celebrationSignal);
+
+  const baseInsightCards: InsightCard[] =
     aiInsights?.cards?.length
       ? aiInsights.cards.slice(0, 2)
       : [
@@ -288,6 +392,19 @@ export default function InsightsScreen() {
             color: "#3B82F6",
           },
         ];
+
+  const celebrationCard: InsightCard = {
+    title: isCelebrationReady ? "Resilience Master" : aiLoading ? "Celebrating progress" : "Celebration unlocked",
+    subtitle: isCelebrationReady
+      ? "Your consistency is turning into real momentum."
+      : aiLoading
+        ? "A celebration card will appear after analysis."
+        : "Keep journaling to unlock your next win.",
+    icon: "gift-outline",
+    color: "#EC4899",
+  };
+
+  const insightCards: InsightCard[] = [...baseInsightCards, celebrationCard];
 
   const insightTips: InsightTip[] =
     aiInsights?.tips?.length
@@ -329,6 +446,7 @@ export default function InsightsScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+      <ConfettiDrop visible={showConfetti} />
 
       <LinearGradient
         colors={theme.gradient}
@@ -492,51 +610,106 @@ export default function InsightsScreen() {
           </View>
         )}
 
-        <View style={styles.twoColRow}>
-          {showAiSkeleton
-            ? [0, 1].map((index) => (
-                <View
-                  key={`skeleton-card-${index}`}
-                  style={[
-                    styles.highlightCard,
-                    { backgroundColor: FALLBACK_CARD_BACKGROUNDS[index % FALLBACK_CARD_BACKGROUNDS.length] },
-                  ]}
-                >
-                  <ShimmerSkeleton width={38} height={38} borderRadius={19} style={{ marginBottom: 12 }} />
-                  <ShimmerSkeleton width="72%" height={15} style={{ marginBottom: 8 }} />
-                  <ShimmerSkeleton width="100%" height={13} style={{ marginBottom: 6 }} />
-                  <ShimmerSkeleton width="86%" height={13} />
-                </View>
-              ))
-            : insightCards.map((card, index) => (
-                <TouchableOpacity
-                  key={`${card.title}-${index}`}
-                  activeOpacity={card.focusKeyword ? 0.85 : 1}
-                  onPress={() => handleInsightPress(card)}
-                  style={[
-                    styles.highlightCard,
-                    { backgroundColor: FALLBACK_CARD_BACKGROUNDS[index % FALLBACK_CARD_BACKGROUNDS.length] },
-                  ]}
-                >
-                  <View style={[styles.highlightIconWrap, { backgroundColor: withOpacity(card.color, 0.14) }]}>
-                    <Ionicons name={card.icon as any} size={20} color={card.color} />
+        <View style={styles.sectionHeader}>
+          <Text style={{ fontSize: 14 }}>🎉</Text>
+          <Text style={styles.sectionTitle}>Highlights</Text>
+        </View>
+
+        <View style={styles.cardsStack}>
+          <View style={styles.twoColRow}>
+            {showAiSkeleton
+              ? [0, 1].map((index) => (
+                  <View
+                    key={`skeleton-card-${index}`}
+                    style={[
+                      styles.highlightCard,
+                      { backgroundColor: FALLBACK_CARD_BACKGROUNDS[index % FALLBACK_CARD_BACKGROUNDS.length] },
+                    ]}
+                  >
+                    <ShimmerSkeleton width={38} height={38} borderRadius={19} style={{ marginBottom: 12 }} />
+                    <ShimmerSkeleton width="72%" height={15} style={{ marginBottom: 8 }} />
+                    <ShimmerSkeleton width="100%" height={13} style={{ marginBottom: 6 }} />
+                    <ShimmerSkeleton width="86%" height={13} />
                   </View>
-                  <Text style={styles.highlightTitle}>{card.title}</Text>
-                  <Text style={styles.highlightSub}>{card.subtitle}</Text>
-                  {card.focusKeyword ? (
-                    <View style={styles.cardActionRow}>
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        onPress={() => handleInsightPress(card)}
-                        style={styles.cardActionButton}
-                      >
-                        <Text style={styles.cardActionButtonText}>View related entries</Text>
-                        <Ionicons name="arrow-forward" size={14} color="#2563EB" />
-                      </TouchableOpacity>
+                ))
+              : baseInsightCards.map((card, index) => (
+                  <TouchableOpacity
+                    key={`${card.title}-${index}`}
+                    activeOpacity={card.focusKeyword ? 0.85 : 1}
+                    onPress={() => handleInsightPress(card)}
+                    style={[
+                      styles.highlightCard,
+                      {
+                        backgroundColor: getCardTheme(card, index).backgroundColor,
+                        borderTopColor: getCardTheme(card, index).topStrip,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.highlightIconWrap, { backgroundColor: getCardTheme(card, index).iconBackground }]}>
+                      <Ionicons name={card.icon as any} size={20} color={card.color} />
                     </View>
-                  ) : null}
-                </TouchableOpacity>
-              ))}
+                    <Text style={[styles.highlightTitle, { color: getCardTheme(card, index).titleColor }]}>{card.title}</Text>
+                    <Text style={[styles.highlightSub, { color: getCardTheme(card, index).subColor }]}>{card.subtitle}</Text>
+                    {card.focusKeyword ? (
+                      <View style={styles.cardActionRow}>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => handleInsightPress(card)}
+                          style={styles.cardActionButton}
+                        >
+                          <Text style={styles.cardActionButtonText}>View related entries</Text>
+                          <Ionicons name="arrow-forward" size={14} color="#2563EB" />
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
+                ))}
+          </View>
+
+          {showAiSkeleton ? (
+            <View style={[styles.highlightCard, { backgroundColor: "#FDF2F8", borderTopColor: "transparent", width: "100%" }]}>
+              <ShimmerSkeleton width={38} height={38} borderRadius={19} style={{ marginBottom: 12 }} />
+              <ShimmerSkeleton width="58%" height={15} style={{ marginBottom: 8 }} />
+              <ShimmerSkeleton width="100%" height={13} style={{ marginBottom: 6 }} />
+              <ShimmerSkeleton width="82%" height={13} />
+            </View>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                if (celebrationCard.focusKeyword) {
+                  handleInsightPress(celebrationCard);
+                }
+              }}
+              style={{ width: "100%" }}
+            >
+              <LinearGradient
+                colors={["#FCE7F3", "#DBEAFE", "#D1FAE5", "#FEE2E2"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[
+                  styles.highlightCard,
+                  {
+                    borderTopColor: "#EC4899",
+                  },
+                ]}
+              >
+                <View style={[styles.highlightIconWrap, { backgroundColor: "rgba(236, 72, 153, 0.15)" }]}>
+                  <Ionicons name={celebrationCard.icon as any} size={20} color="#EC4899" />
+                </View>
+                <Text style={styles.highlightTitle}>{celebrationCard.title}</Text>
+                <Text style={styles.highlightSub}>{celebrationCard.subtitle}</Text>
+                {showConfetti ? (
+                  <View style={styles.cardActionRow}>
+                    <View style={[styles.cardActionButton, { borderColor: "#FBCFE8" }]}>
+                      <Text style={[styles.cardActionButtonText, { color: "#DB2777" }]}>Confetti drop active</Text>
+                      <Ionicons name="sparkles" size={14} color="#EC4899" />
+                    </View>
+                  </View>
+                ) : null}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.sectionHeader}>
@@ -801,15 +974,105 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 16,
   },
+  cardsStack: {
+    gap: 12,
+    marginTop: 16,
+  },
   highlightCard: {
     flex: 1,
     borderRadius: 16,
     padding: 18,
+    borderTopWidth: 4,
+    borderTopColor: "transparent",
     elevation: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
+  },
+  celebrationCard: {
+    flex: 0,
+    width: "100%",
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingHorizontal: 0,
+  },
+  celebrationGradient: {
+    borderRadius: 16,
+    padding: 16,
+    minHeight: 146,
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.18)",
+  },
+  celebrationHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  celebrationBadgeWrap: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 0,
+  },
+  celebrationBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(245, 158, 11, 0.18)",
+    color: "#B45309",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+  celebrationSparkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  celebrationSparkDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: "#F59E0B",
+    opacity: 0.7,
+  },
+  celebrationSparkDotSmall: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "#FBBF24",
+    opacity: 0.9,
+  },
+  celebrationSparkDotGold: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "#F59E0B",
+    opacity: 0.85,
+  },
+  celebrationBodyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  celebrationTextCol: {
+    flex: 1,
+  },
+  celebrationIconRing: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    padding: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  celebrationIconCore: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "rgba(255,255,255,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   highlightIconWrap: {
     width: 38,
@@ -844,6 +1107,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#BFDBFE",
+  },
+  celebrationActionButton: {
+    backgroundColor: "rgba(255,255,255,0.8)",
+    borderColor: "rgba(245, 158, 11, 0.35)",
+  },
+  celebrationActionButtonText: {
+    color: "#B45309",
   },
   cardActionButtonText: {
     fontSize: 11,
