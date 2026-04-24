@@ -230,7 +230,7 @@ export default function CalmBreathingScreen() {
               </View>
             </View>
 
-            <View style={styles.statsRow}>
+            <View style={styles.statsRowLower}>
               <View style={styles.statCard}>
                 <Text style={styles.statValue}>{cycleCount}</Text>
                 <Text style={styles.statLabel}>Completed cycles</Text>
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   primaryButtonText: { fontSize: 15, fontWeight: "700", color: "#FFFFFF" },
   secondaryButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#F5F3FF", paddingHorizontal: 22, paddingVertical: 14, borderRadius: 16, gap: 8, minWidth: 124 },
   secondaryButtonText: { fontSize: 15, fontWeight: "700", color: "#6D28D9" },
-  statsRow: { flexDirection: "row", gap: 12, marginTop: 18 },
+  statsRowLower: { flexDirection: "row", gap: 12, marginTop: 18 },
   statCard: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 18, padding: 18 },
   statValue: { fontSize: 22, fontWeight: "700", color: "#312E81" },
   statLabel: { fontSize: 12, color: "#7C7A92", marginTop: 4 },

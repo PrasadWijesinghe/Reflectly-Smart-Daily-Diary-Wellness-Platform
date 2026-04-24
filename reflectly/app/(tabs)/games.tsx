@@ -129,7 +129,7 @@ const GAMES: Game[] = [
     id: 8,
     title: "Tapping Game",
     subtitle: "Tap targets before they disappear!",
-    icon: "finger-outline",
+    icon: "hand-left-outline",
     route: "/games/tapping-game",
     iconBg: "#DC2828",
     cardBg: "#FFE5E5",

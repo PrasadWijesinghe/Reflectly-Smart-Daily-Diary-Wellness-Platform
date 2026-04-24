@@ -66,22 +66,12 @@ function LayoutContent() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <MusicProvider>
-        <LayoutContent />
-      </MusicProvider>
-    </AuthProvider>
     <ThemeProvider>
       <AuthProvider>
-        <>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="viewall-diary" />
-          </Stack>
+        <MusicProvider>
+          <LayoutContent />
           <AppLockGate />
-        </>
+        </MusicProvider>
       </AuthProvider>
     </ThemeProvider>
   );

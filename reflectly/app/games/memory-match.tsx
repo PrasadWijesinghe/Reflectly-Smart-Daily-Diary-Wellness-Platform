@@ -246,6 +246,7 @@ const styles = StyleSheet.create({
   gridContainer: { flex: 1, justifyContent: "center", paddingVertical: 8, paddingHorizontal: 4 },
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 10 },
   card: { width: "29%", aspectRatio: 1, borderRadius: 16, backgroundColor: "#1D4ED8", alignItems: "center", justifyContent: "center" },
+  cardClosed: { backgroundColor: "#1D4ED8" },
   cardOpen: { backgroundColor: "#FFFFFF", borderWidth: 2, borderColor: "#BFDBFE" },
   cardEmoji: { fontSize: 36, fontWeight: "700", color: "#FFFFFF" },
   cardEmojiOpen: { color: "#1E3A8A" },
