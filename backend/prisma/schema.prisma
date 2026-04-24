@@ -24,10 +24,24 @@ model DailyDiary {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   userId    Int
+  moodScore Int?
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tags      Tag[]
+  images    DiaryImage[]
 
   @@unique([userId, date])
+}
+
+model DiaryImage {
+  id           Int        @id @default(autoincrement())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  order        Int
+  diaryId      Int
+  diary        DailyDiary @relation(fields: [diaryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
 }
 
 model Tag {

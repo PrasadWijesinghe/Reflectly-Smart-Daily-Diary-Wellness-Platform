@@ -13,13 +13,25 @@ import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
 import { DeviceEventEmitter } from "react-native";
-import { getApiUrl } from "../utils/api";
+import { getApiUrl, getImageUrl } from "../utils/api";
 import { DIARY_UPDATED_EVENT } from "../utils/notifications";
 import ConfirmModal from "./ConfirmModal";
+import ImagePickerButton from "./ImagePickerButton";
+import ImageThumbnailStrip from "./ImageThumbnailStrip";
+import FullscreenImageViewer from "./FullscreenImageViewer";
 
 type RecordingState = "idle" | "recording" | "processing";
 type Tag = { id: number; name: string; icon: string; color: string };
-type DiaryEntry = { id: number; date: string; content: string; summary: string; tags: Tag[] };
+type DiaryImage = {
+  id: number;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  order: number;
+  url: string;
+};
+type DiaryEntry = { id: number; date: string; content: string; summary: string; tags: Tag[]; images: DiaryImage[] };
 
 type Props = {
   entry?: DiaryEntry | null;
@@ -37,9 +49,16 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [savedImages, setSavedImages] = useState<DiaryImage[]>(entry?.images ?? []);
+  const [pendingUris, setPendingUris] = useState<string[]>([]);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerImages, setViewerImages] = useState<string[]>([]);
   const recording = useRef<Audio.Recording | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const totalImages = savedImages.length + pendingUris.length;
 
   const handleSave = async () => {
     if (!diaryText.trim()) return Alert.alert("Empty Entry", "Please write something before saving.");
@@ -72,6 +91,34 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
         throw new Error(err.error || "Failed to save entry");
       }
 
+      const saved = await res.json();
+      const entryId: number = saved.entry?.id ?? saved.id ?? entry?.id;
+
+      if (pendingUris.length > 0 && entryId) {
+        try {
+          const formData = new FormData();
+          pendingUris.forEach((uri, i) => {
+            const ext = uri.split(".").pop() || "jpg";
+            formData.append("images", { uri, name: `photo_${i}.${ext}`, type: `image/${ext}` } as any);
+          });
+          const imgRes = await fetch(`${getApiUrl()}/diary/${entryId}/images`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          });
+          if (imgRes.ok) {
+            const imgData = await imgRes.json();
+            setSavedImages(imgData.images ?? []);
+            setPendingUris([]);
+          } else {
+            const imgErr = await imgRes.json().catch(() => ({ error: "Upload failed" }));
+            Alert.alert("Image Upload Failed", imgErr.error || "Entry saved, but images could not be uploaded.");
+          }
+        } catch (imgErr: any) {
+          Alert.alert("Image Upload Failed", imgErr.message || "Entry saved, but images could not be uploaded.");
+        }
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       DeviceEventEmitter.emit(DIARY_UPDATED_EVENT);
       onSave();
@@ -81,6 +128,45 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleRemoveSaved = async (id: number) => {
+    try {
+      const res = await fetch(`${getApiUrl()}/diary/images/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Delete failed" }));
+        Alert.alert("Error", err.error || "Could not remove image.");
+        return;
+      }
+      setSavedImages((prev) => prev.filter((img) => img.id !== id));
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Could not remove image.");
+    }
+  };
+
+  const handleRemovePending = (index: number) => {
+    setPendingUris((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleThumbPress = (index: number, source: "saved" | "pending") => {
+    const allUrls = [
+      ...savedImages.map((img) => getImageUrl(img.url)),
+      ...pendingUris,
+    ];
+    const absoluteIndex = source === "saved" ? index : savedImages.length + index;
+    setViewerImages(allUrls);
+    setViewerIndex(absoluteIndex);
+    setViewerVisible(true);
+  };
+
+  const handleImagesSelected = (uris: string[]) => {
+    setPendingUris((prev) => {
+      const remaining = 5 - savedImages.length - prev.length;
+      return [...prev, ...uris.slice(0, remaining)];
+    });
   };
 
   const toggleTag = (tagId: number) => {
@@ -177,7 +263,7 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
       <View style={styles.entryCard}>
         <View style={styles.entryHeader}>
           <Text style={{ fontSize: 18 }}>✍️</Text>
-          <Text style={styles.entryHeaderText}>{entry ? "Edit your entry" : "What’s on your mind?"}</Text>
+          <Text style={styles.entryHeaderText}>{entry ? "Edit your entry" : "What's on your mind?"}</Text>
           <View style={{ flex: 1 }} />
           {entry && (
             <TouchableOpacity onPress={onCancel} style={styles.cancelBtn}>
@@ -223,8 +309,26 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
           textAlignVertical="top"
         />
 
+        {totalImages > 0 && (
+          <View style={styles.thumbnailStripWrapper}>
+            <ImageThumbnailStrip
+              images={savedImages}
+              pendingUris={pendingUris}
+              editMode
+              onRemoveSaved={handleRemoveSaved}
+              onRemovePending={handleRemovePending}
+              onPress={handleThumbPress}
+            />
+          </View>
+        )}
+
         <View style={styles.entryFooter}>
           <Text style={styles.charCount}>📝 {diaryText.length} characters</Text>
+          <ImagePickerButton
+            onImagesSelected={handleImagesSelected}
+            maxImages={5 - totalImages}
+            disabled={totalImages >= 5}
+          />
           <Text style={styles.timeStamp}>🕐 {timeString}</Text>
         </View>
       </View>
@@ -264,6 +368,13 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
         onConfirm={saveEntry}
         onCancel={() => setShowUpdateModal(false)}
       />
+
+      <FullscreenImageViewer
+        visible={viewerVisible}
+        images={viewerImages}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
+      />
     </View>
   );
 }
@@ -283,7 +394,8 @@ const styles = StyleSheet.create({
   recordingText: { fontSize: 12, color: "#EF4444", fontWeight: "600" },
   processingText: { fontSize: 12, color: "#9CA3AF", fontWeight: "600" },
   textInput: { minHeight: 120, fontSize: 14, color: "#374151", lineHeight: 22, padding: 0 },
-  entryFooter: { flexDirection: "row", justifyContent: "space-between", marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F3F4F6" },
+  thumbnailStripWrapper: { marginTop: 10, marginHorizontal: -4 },
+  entryFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F3F4F6" },
   charCount: { fontSize: 12, color: "#9CA3AF" },
   timeStamp: { fontSize: 12, color: "#9CA3AF" },
   tagSection: { marginTop: 14 },
