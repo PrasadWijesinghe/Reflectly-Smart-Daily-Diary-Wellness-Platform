@@ -60,11 +60,15 @@ export default function RootLayout() {
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="viewall-diary" />
-              <Stack.Screen name="music" />
+            <Stack.Screen name="music" />
             </Stack>
             <GlobalMiniPlayer />
             <AppLockGate />
           </>
+<<<<<<< HEAD
+=======
+
+>>>>>>> 14a5bc64478bc5c3d69bce8ea00355b968c05dc9
         </MusicProvider>
       </AuthProvider>
     </ThemeProvider>
