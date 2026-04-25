@@ -59,7 +59,7 @@ export default function ImagePickerButton({
       }),
     ]).start(() => {
       setSheetVisible(false);
-      cb?.();
+      if (cb) setTimeout(cb, 150);
     });
   };
 
