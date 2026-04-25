@@ -1,0 +1,4 @@
+ALTER TABLE "User"
+ADD COLUMN "appLockEnabled" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "appLockType" TEXT,
+ADD COLUMN "appLockHash" TEXT;

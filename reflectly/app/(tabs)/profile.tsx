@@ -1,16 +1,23 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Text,
-  View,
+  ActivityIndicator,
+  Modal,
+  RefreshControl,
   ScrollView,
-  TouchableOpacity,
   StatusBar,
   StyleSheet,
+  TextInput,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
+import { getApiUrl } from "../../utils/api";
+import { THEMES, ThemeId } from "../../utils/theme";
 
 type SettingRow = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -18,6 +25,28 @@ type SettingRow = {
   label: string;
   value?: string;
   valueColor?: string;
+};
+
+type ProfileUser = {
+  id: number;
+  name: string;
+  email: string;
+  createdAt: string;
+  appLockEnabled?: boolean;
+  appLockType?: "pin" | "password" | null;
+};
+
+const THEME_LABELS: Record<ThemeId, string> = {
+  blue: "Blue",
+  green: "Green",
+  purple: "Purple",
+  yellow: "Yellow",
+  red: "Red",
+};
+
+type DiaryEntry = {
+  id: number;
+  date: string;
 };
 
 const DIARY_PREFS: SettingRow[] = [
@@ -35,22 +64,12 @@ const DIARY_PREFS: SettingRow[] = [
     value: "On",
     valueColor: "#10B981",
   },
-];
-
-const PRIVACY: SettingRow[] = [
   {
-    icon: "lock-closed",
-    iconColor: "#F59E0B",
-    label: "Privacy Settings",
-    value: "Private",
-    valueColor: "#3B82F6",
-  },
-  {
-    icon: "shield-checkmark",
-    iconColor: "#3B82F6",
-    label: "Data Security",
-    value: "Encrypted",
-    valueColor: "#3B82F6",
+    icon: "color-palette",
+    iconColor: "#8B5CF6",
+    label: "App Theme",
+    value: "Blue",
+    valueColor: "#8B5CF6",
   },
 ];
 
@@ -67,15 +86,61 @@ const SUPPORT: SettingRow[] = [
   },
 ];
 
-const STATS = [
-  { value: "47", label: "Entries", emoji: "📝" },
-  { value: "12", label: "Streak", emoji: "🔥" },
-  { value: "8", label: "This Week", emoji: "🌟" },
-];
+function formatMemberSince(createdAt?: string) {
+  if (!createdAt) return "Member since recently";
+  return `Member since ${new Date(createdAt).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+  })}`;
+}
 
-function SettingItem({ item }: { item: SettingRow }) {
+function getInitials(name?: string) {
+  if (!name) return "U";
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((part) => part[0]?.toUpperCase() || "").join("") || "U";
+}
+
+function calculateStreak(entries: DiaryEntry[]) {
+  const days = new Set(
+    entries.map((entry) => new Date(entry.date).toISOString().split("T")[0])
+  );
+
+  let streak = 0;
+  const current = new Date();
+  current.setHours(0, 0, 0, 0);
+
+  while (days.has(current.toISOString().split("T")[0])) {
+    streak += 1;
+    current.setDate(current.getDate() - 1);
+  }
+
+  return streak;
+}
+
+function calculateThisWeek(entries: DiaryEntry[]) {
+  const now = new Date();
+  const currentDay = now.getDay();
+  const weekStart = new Date(now);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(now.getDate() - currentDay);
+
+  return entries.filter((entry) => new Date(entry.date) >= weekStart).length;
+}
+
+function SettingItem({ item, onPress }: { item: SettingRow; onPress?: () => void }) {
+  const router = useRouter();
+
+  const handlePress = () => {
+    if (item.label === "Send Feedback") {
+      router.push("/feedback");
+      return;
+    }
+
+    onPress?.();
+  };
+
   return (
-    <TouchableOpacity style={styles.settingRow} activeOpacity={0.6}>
+    <TouchableOpacity style={styles.settingRow} activeOpacity={0.6} onPress={handlePress}>
       <View style={styles.settingLeft}>
         <View
           style={[styles.settingIconWrap, { backgroundColor: item.iconColor + "18" }]}
@@ -103,19 +168,213 @@ function SettingItem({ item }: { item: SettingRow }) {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, token, user, setupAppLock, disableAppLock } = useAuth();
+  const { theme, themeId, setThemeId } = useTheme();
+  const [profile, setProfile] = useState<ProfileUser | null>(null);
+  const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isThemeModalVisible, setIsThemeModalVisible] = useState(false);
+  const [isLockModalVisible, setIsLockModalVisible] = useState(false);
+  const [lockType, setLockType] = useState<"pin" | "password">("pin");
+  const [lockValue, setLockValue] = useState("");
+  const [lockConfirmValue, setLockConfirmValue] = useState("");
+  const [lockError, setLockError] = useState<string | null>(null);
+  const [isSavingLock, setIsSavingLock] = useState(false);
+
+  async function loadProfileData(showRefresh = false) {
+    if (!token) {
+      setProfile(null);
+      setEntries([]);
+      setIsLoading(false);
+      return;
+    }
+
+    if (showRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+
+    try {
+      setError(null);
+
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [meRes, diaryRes] = await Promise.all([
+        fetch(`${getApiUrl()}/auth/me`, { headers }),
+        fetch(`${getApiUrl()}/diary`, { headers }),
+      ]);
+
+      const meData = await meRes.json();
+      const diaryData = await diaryRes.json();
+
+      if (!meRes.ok) {
+        throw new Error(meData.error || "Failed to load profile.");
+      }
+
+      if (!diaryRes.ok) {
+        throw new Error(diaryData.error || "Failed to load diary stats.");
+      }
+
+      setProfile(meData.user);
+      setEntries(Array.isArray(diaryData.entries) ? diaryData.entries : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load profile.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    loadProfileData();
+  }, [token]);
+
+  const diaryItems = useMemo<SettingRow[]>(
+    () => [
+      {
+        icon: "lock-closed",
+        iconColor: "#F59E0B",
+        label: "App Lock",
+        value: profile?.appLockEnabled
+          ? profile?.appLockType === "pin"
+            ? "PIN Enabled"
+            : "Password Enabled"
+          : "Off",
+        valueColor: profile?.appLockEnabled ? "#10B981" : "#9CA3AF",
+      },
+      {
+        icon: "shield-checkmark",
+        iconColor: "#3B82F6",
+        label: "Data Security",
+        value: "Encrypted",
+        valueColor: "#3B82F6",
+      },
+    ],
+    [profile?.appLockEnabled, profile?.appLockType]
+  );
+
+  const diaryPrefs = useMemo<SettingRow[]>(
+    () =>
+      DIARY_PREFS.map((item) =>
+        item.label === "App Theme"
+          ? {
+              ...item,
+              value: THEME_LABELS[themeId],
+              valueColor: theme.primary,
+            }
+          : item
+      ),
+    [theme.primary, themeId]
+  );
 
   async function handleLogout() {
     await logout();
     router.replace("/(auth)/login");
   }
+
+  async function handleSaveLock() {
+    const normalizedValue = lockType === "pin" ? lockValue.trim() : lockValue;
+    const normalizedConfirm = lockType === "pin" ? lockConfirmValue.trim() : lockConfirmValue;
+
+    if (!normalizedValue || !normalizedConfirm) {
+      setLockError("Please complete both fields.");
+      return;
+    }
+
+    if (normalizedValue !== normalizedConfirm) {
+      setLockError("The values do not match.");
+      return;
+    }
+
+    if (lockType === "pin" && !/^\d{4}$/.test(normalizedValue)) {
+      setLockError("PIN must be exactly 4 digits.");
+      return;
+    }
+
+    if (lockType === "password" && normalizedValue.length < 6) {
+      setLockError("App password must be at least 6 characters.");
+      return;
+    }
+
+    try {
+      setIsSavingLock(true);
+      setLockError(null);
+      await setupAppLock(lockType, normalizedValue);
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              appLockEnabled: true,
+              appLockType: lockType,
+            }
+          : current
+      );
+      setIsLockModalVisible(false);
+      setLockValue("");
+      setLockConfirmValue("");
+    } catch (err) {
+      setLockError(err instanceof Error ? err.message : "Failed to save app lock.");
+    } finally {
+      setIsSavingLock(false);
+    }
+  }
+
+  async function handleDisableLock() {
+    try {
+      setIsSavingLock(true);
+      setLockError(null);
+      await disableAppLock();
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              appLockEnabled: false,
+              appLockType: null,
+            }
+          : current
+      );
+      setIsLockModalVisible(false);
+      setLockValue("");
+      setLockConfirmValue("");
+    } catch (err) {
+      setLockError(err instanceof Error ? err.message : "Failed to disable app lock.");
+    } finally {
+      setIsSavingLock(false);
+    }
+  }
+
+  async function handleThemeSelect(nextThemeId: ThemeId) {
+    try {
+      await setThemeId(nextThemeId);
+      setIsThemeModalVisible(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update theme.");
+    }
+  }
+
+  const stats = useMemo(
+    () => [
+      { value: String(entries.length), label: "Entries", emoji: "📝" },
+      { value: String(calculateStreak(entries)), label: "Streak", emoji: "🔥" },
+      { value: String(calculateThisWeek(entries)), label: "This Week", emoji: "🌟" },
+    ],
+    [entries]
+  );
+
+  const displayName = profile?.name || user?.name || "User";
+  const displayEmail = profile?.email || user?.email || "No email";
+  const displayCreatedAt = profile?.createdAt;
+  const initials = getInitials(displayName);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      {/* Header */}
       <LinearGradient
-        colors={["#3B82F6", "#2563EB", "#1D4ED8"]}
+        colors={theme.gradient}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -125,9 +384,7 @@ export default function ProfileScreen() {
             </View>
             <View>
               <Text style={styles.headerTitle}>Profile</Text>
-              <Text style={styles.headerSubtitle}>
-                Your account & settings ⚙️
-              </Text>
+              <Text style={styles.headerSubtitle}>Your account and settings</Text>
             </View>
           </View>
         </View>
@@ -137,61 +394,80 @@ export default function ProfileScreen() {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => loadProfileData(true)}
+            tintColor={theme.primary}
+          />
+        }
       >
-        {/* Profile Card */}
         <LinearGradient
-          colors={["#3B82F6", "#6366F1", "#7C3AED"]}
+          colors={[theme.primary, theme.primaryDark, theme.primary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.profileCard}
         >
           <View style={styles.profileTop}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>AJ</Text>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.profileName}>Alex Johnson</Text>
-              <Text style={styles.profileEmail}>alex.johnson@university.edu</Text>
-              <Text style={styles.profileSince}>Member since January 2025 📅</Text>
+              <Text style={styles.profileName}>{displayName}</Text>
+              <Text style={styles.profileEmail}>{displayEmail}</Text>
+              <Text style={styles.profileSince}>{formatMemberSince(displayCreatedAt)}</Text>
             </View>
           </View>
 
-          {/* Stats Row */}
-          <View style={styles.statsRow}>
-            {STATS.map((stat, index) => (
-              <View key={index} style={styles.statItem}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>
-                  {stat.label} {stat.emoji}
-                </Text>
-              </View>
-            ))}
-          </View>
+          {isLoading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color="#FFFFFF" />
+              <Text style={styles.loadingText}>Loading profile...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorWrap}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : (
+            <View style={styles.statsRow}>
+              {stats.map((stat) => (
+                <View key={stat.label} style={styles.statItem}>
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>
+                    {stat.label} {stat.emoji}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </LinearGradient>
 
-        {/* Diary Preferences */}
         <Text style={styles.sectionLabel}>DIARY PREFERENCES</Text>
         <View style={styles.sectionCard}>
-          {DIARY_PREFS.map((item, i) => (
+          {diaryPrefs.map((item, i) => (
             <View key={i}>
-              <SettingItem item={item} />
-              {i < DIARY_PREFS.length - 1 && <View style={styles.divider} />}
+              <SettingItem
+                item={item}
+                onPress={item.label === "App Theme" ? () => setIsThemeModalVisible(true) : undefined}
+              />
+              {i < diaryPrefs.length - 1 && <View style={styles.divider} />}
             </View>
           ))}
         </View>
 
-        {/* Privacy & Security */}
         <Text style={styles.sectionLabel}>PRIVACY & SECURITY</Text>
         <View style={styles.sectionCard}>
-          {PRIVACY.map((item, i) => (
+          {diaryItems.map((item, i) => (
             <View key={i}>
-              <SettingItem item={item} />
-              {i < PRIVACY.length - 1 && <View style={styles.divider} />}
+              <SettingItem
+                item={item}
+                onPress={item.label === "App Lock" ? () => setIsLockModalVisible(true) : undefined}
+              />
+              {i < diaryItems.length - 1 && <View style={styles.divider} />}
             </View>
           ))}
         </View>
 
-        {/* Support */}
         <Text style={styles.sectionLabel}>SUPPORT</Text>
         <View style={styles.sectionCard}>
           {SUPPORT.map((item, i) => (
@@ -202,42 +478,151 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* About This App */}
-        <View style={styles.aboutCard}>
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-            <Text style={{ fontSize: 16, marginRight: 8 }}>💡</Text>
-            <Text style={styles.aboutTitle}>About This App</Text>
-          </View>
-          <Text style={styles.aboutText}>
-            Student Life Diary helps you reflect on daily experiences and track
-            your wellbeing in a fun, friendly way!
-          </Text>
-          <View style={styles.aboutNote}>
-            <Text style={styles.aboutNoteText}>
-              <Text style={{ fontWeight: "700", color: "#1F2937" }}>Note: </Text>
-              This app provides general wellness insights and is not a substitute
-              for professional advice. If you need support, please reach out to a
-              qualified healthcare provider. 💙
-            </Text>
-          </View>
-        </View>
-
-        {/* Logout Button */}
         <TouchableOpacity
           style={styles.logoutBtn}
           onPress={handleLogout}
           activeOpacity={0.8}
         >
-          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+          <Ionicons name="log-out-outline" size={20} color={theme.danger} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerVersion}>Student Life Diary v1.0.0</Text>
-          <Text style={styles.footerMade}>Made with 💙 for students</Text>
-        </View>
       </ScrollView>
+
+      <Modal
+        visible={isThemeModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsThemeModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Choose Theme</Text>
+              <TouchableOpacity onPress={() => setIsThemeModalVisible(false)} activeOpacity={0.7}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>Pick a color mood for the whole app.</Text>
+
+            <View style={styles.themeGrid}>
+              {THEMES.map((item) => {
+                const selected = item.id === themeId;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.themeCard, selected && styles.themeCardActive]}
+                    onPress={() => handleThemeSelect(item.id)}
+                    activeOpacity={0.85}
+                  >
+                    <LinearGradient colors={item.gradient} style={styles.themeSwatch} />
+                    <Text style={styles.themeName}>{item.name}</Text>
+                    <Text style={styles.themeLabel}>{selected ? "Selected" : "Tap to apply"}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isLockModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsLockModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>App Lock</Text>
+              <TouchableOpacity onPress={() => setIsLockModalVisible(false)} activeOpacity={0.7}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Set a unique {lockType === "pin" ? "PIN" : "password"} for this user account.
+            </Text>
+
+            <View style={styles.toggleRow}>
+              {(["pin", "password"] as const).map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.toggleButton, lockType === type && styles.toggleButtonActive]}
+                  onPress={() => {
+                    setLockType(type);
+                    setLockValue("");
+                    setLockConfirmValue("");
+                    setLockError(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[styles.toggleLabel, lockType === type && styles.toggleLabelActive]}
+                  >
+                    {type === "pin" ? "PIN" : "Password"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              value={lockValue}
+              onChangeText={(value) => {
+                setLockValue(value);
+                if (lockError) setLockError(null);
+              }}
+              placeholder={lockType === "pin" ? "Enter 4-digit PIN" : "Create app password"}
+              placeholderTextColor="#94A3B8"
+              secureTextEntry
+              keyboardType={lockType === "pin" ? "number-pad" : "default"}
+              maxLength={lockType === "pin" ? 4 : 32}
+              style={styles.modalInput}
+            />
+
+            <TextInput
+              value={lockConfirmValue}
+              onChangeText={(value) => {
+                setLockConfirmValue(value);
+                if (lockError) setLockError(null);
+              }}
+              placeholder={lockType === "pin" ? "Confirm PIN" : "Confirm app password"}
+              placeholderTextColor="#94A3B8"
+              secureTextEntry
+              keyboardType={lockType === "pin" ? "number-pad" : "default"}
+              maxLength={lockType === "pin" ? 4 : 32}
+              style={styles.modalInput}
+            />
+
+            {lockError ? <Text style={styles.lockErrorText}>{lockError}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.primaryButton, isSavingLock && styles.disabledAction]}
+              onPress={handleSaveLock}
+              disabled={isSavingLock}
+              activeOpacity={0.85}
+            >
+              {isSavingLock ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Save App Lock</Text>
+              )}
+            </TouchableOpacity>
+
+            {profile?.appLockEnabled ? (
+              <TouchableOpacity
+                style={[styles.secondaryButton, isSavingLock && styles.disabledAction]}
+                onPress={handleDisableLock}
+                disabled={isSavingLock}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.secondaryButtonText}>Turn Off App Lock</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -323,6 +708,26 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.6)",
     marginTop: 3,
   },
+  loadingWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+  },
+  loadingText: {
+    color: "#FFFFFF",
+    marginTop: 8,
+    fontSize: 13,
+  },
+  errorWrap: {
+    backgroundColor: "rgba(239,68,68,0.18)",
+    borderRadius: 12,
+    padding: 12,
+  },
+  errorText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    lineHeight: 18,
+  },
   statsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -403,38 +808,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     marginLeft: 60,
   },
-  aboutCard: {
-    backgroundColor: "#FFFBEB",
-    borderRadius: 16,
-    padding: 18,
-    marginTop: 22,
-  },
-  aboutTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1F2937",
-  },
-  aboutText: {
-    fontSize: 13,
-    color: "#6B7280",
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  aboutNote: {
-    backgroundColor: "#FFF7ED",
-    borderRadius: 10,
-    padding: 12,
-  },
-  aboutNoteText: {
-    fontSize: 12,
-    color: "#EF4444",
-    lineHeight: 18,
-  },
-  footer: {
-    alignItems: "center",
-    marginTop: 24,
-    paddingBottom: 10,
-  },
   logoutBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -453,14 +826,135 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#EF4444",
   },
-  footerVersion: {
-    fontSize: 12,
-    color: "#3B82F6",
-    fontWeight: "500",
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.4)",
+    justifyContent: "center",
+    paddingHorizontal: 20,
   },
-  footerMade: {
-    fontSize: 11,
-    color: "#9CA3AF",
+  modalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 20,
+  },
+  themeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginTop: 18,
+  },
+  themeCard: {
+    width: "47%",
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F8FAFC",
+  },
+  themeCardActive: {
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+  },
+  themeSwatch: {
+    height: 44,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+  themeName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  themeLabel: {
     marginTop: 4,
+    fontSize: 12,
+    color: "#64748B",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  modalSubtitle: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#64748B",
+  },
+  toggleRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 18,
+  },
+  toggleButton: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    backgroundColor: "#F8FAFC",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  toggleButtonActive: {
+    borderColor: "#2563EB",
+    backgroundColor: "#DBEAFE",
+  },
+  toggleLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  toggleLabelActive: {
+    color: "#1D4ED8",
+  },
+  modalInput: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 16,
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: "#0F172A",
+  },
+  lockErrorText: {
+    marginTop: 10,
+    fontSize: 13,
+    color: "#DC2626",
+  },
+  primaryButton: {
+    marginTop: 18,
+    backgroundColor: "#2563EB",
+    borderRadius: 16,
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  secondaryButton: {
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  secondaryButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#DC2626",
+  },
+  disabledAction: {
+    opacity: 0.7,
   },
 });
