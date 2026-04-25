@@ -1,19 +1,11 @@
 const prisma = require("../utils/prisma");
-<<<<<<< HEAD
 const { generateAISummary } = require("../utils/gemini");
 const { regenerateWeekSummary } = require("./weeklyController");
-=======
->>>>>>> 4fae4feaf150876d1783644796361e625c2d29cc
 const {
   incrementDiaryEntriesCreated,
   incrementDiaryEntriesUpdated,
   incrementDiaryEntriesDeleted,
 } = require("../utils/metrics");
-<<<<<<< HEAD
-=======
-const { generateAISummary } = require("../utils/gemini");
-const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
->>>>>>> 4fae4feaf150876d1783644796361e625c2d29cc
 
 function generateSummary(content) {
   const trimmed = content.trim();
@@ -400,14 +392,8 @@ async function createEntry(req, res) {
       include: { tags: true },
     });
 
-<<<<<<< HEAD
-    await regenerateWeekSummary(req.user.userId, normalizedDate);
-    incrementDiaryEntriesCreated();
-=======
     incrementDiaryEntriesCreated();
     await regenerateWeekSummary(req.user.userId, normalizedDate);
-
->>>>>>> 4fae4feaf150876d1783644796361e625c2d29cc
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {
     if (err.code === "P2002") {
@@ -471,14 +457,8 @@ async function updateEntry(req, res) {
       include: { tags: true },
     });
 
-<<<<<<< HEAD
-    await regenerateWeekSummary(req.user.userId, existing.date);
-    incrementDiaryEntriesUpdated();
-=======
     incrementDiaryEntriesUpdated();
     await regenerateWeekSummary(req.user.userId, existing.date);
-
->>>>>>> 4fae4feaf150876d1783644796361e625c2d29cc
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
     console.error("UpdateEntry error:", err);
@@ -498,14 +478,8 @@ async function deleteEntry(req, res) {
 
     await prisma.dailyDiary.delete({ where: { id: existing.id } });
 
-<<<<<<< HEAD
-    await regenerateWeekSummary(req.user.userId, existing.date);
-    incrementDiaryEntriesDeleted();
-=======
     incrementDiaryEntriesDeleted();
     await regenerateWeekSummary(req.user.userId, existing.date);
-
->>>>>>> 4fae4feaf150876d1783644796361e625c2d29cc
     res.json({ message: "Entry deleted." });
   } catch (err) {
     console.error("DeleteEntry error:", err);

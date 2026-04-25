@@ -54,10 +54,6 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <MusicProvider>
-<<<<<<< HEAD
-          <LayoutContent />
-          <AppLockGate />
-=======
           <>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
@@ -69,7 +65,6 @@ export default function RootLayout() {
             <GlobalMiniPlayer />
             <AppLockGate />
           </>
->>>>>>> 4fae4feaf150876d1783644796361e625c2d29cc
         </MusicProvider>
       </AuthProvider>
     </ThemeProvider>
