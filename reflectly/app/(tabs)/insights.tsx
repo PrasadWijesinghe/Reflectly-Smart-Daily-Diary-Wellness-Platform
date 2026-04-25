@@ -141,6 +141,7 @@ export default function InsightsScreen() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiReadyFlash, setAiReadyFlash] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [hasCelebration, setHasCelebration] = useState(false);
 
   React.useEffect(() => {
     if (!token) return;
@@ -343,6 +344,7 @@ export default function InsightsScreen() {
   useEffect(() => {
     if (!aiInsights) {
       setShowConfetti(false);
+      setHasCelebration(false);
       return;
     }
 
@@ -355,21 +357,15 @@ export default function InsightsScreen() {
     const celebrate = /resilience|streak|progress|milestone|consisten|win|celebrat/i.test(joinedText);
     if (!celebrate) {
       setShowConfetti(false);
+      setHasCelebration(false);
       return;
     }
 
+    setHasCelebration(true);
     setShowConfetti(true);
     const timer = setTimeout(() => setShowConfetti(false), 3200);
     return () => clearTimeout(timer);
   }, [aiInsights]);
-
-  const celebrationSignal = aiInsights
-    ? [
-        aiInsights.summary,
-        ...(aiInsights.cards || []).map((card) => `${card.title} ${card.subtitle}`),
-      ].join(" ")
-    : "";
-  const isCelebrationReady = /resilience|streak|progress|milestone|consisten|win|celebrat/i.test(celebrationSignal);
 
   const baseInsightCards: InsightCard[] =
     aiInsights?.cards?.length
@@ -391,17 +387,15 @@ export default function InsightsScreen() {
             icon: "pulse-outline",
             color: "#3B82F6",
           },
-        ];
+  ];
 
   const celebrationCard: InsightCard = {
-    title: isCelebrationReady ? "Resilience Master" : aiLoading ? "Celebrating progress" : "Celebration unlocked",
-    subtitle: isCelebrationReady
+    title: hasCelebration ? "Resilience Master" : "Celebration unlocked",
+    subtitle: hasCelebration
       ? "Your consistency is turning into real momentum."
-      : aiLoading
-        ? "A celebration card will appear after analysis."
-        : "Keep journaling to unlock your next win.",
+      : "Keep journaling to unlock your next win.",
     icon: "gift-outline",
-    color: "#EC4899",
+    color: "#F59E0B",
   };
 
   const insightCards: InsightCard[] = [...baseInsightCards, celebrationCard];
@@ -677,7 +671,11 @@ export default function InsightsScreen() {
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => {
-                if (celebrationCard.focusKeyword) {
+                if (hasCelebration) {
+                  setShowConfetti(false);
+                  setTimeout(() => setShowConfetti(true), 10);
+                  setTimeout(() => setShowConfetti(false), 3210);
+                } else if (celebrationCard.focusKeyword) {
                   handleInsightPress(celebrationCard);
                 }
               }}
@@ -699,10 +697,10 @@ export default function InsightsScreen() {
                 </View>
                 <Text style={styles.highlightTitle}>{celebrationCard.title}</Text>
                 <Text style={styles.highlightSub}>{celebrationCard.subtitle}</Text>
-                {showConfetti ? (
+                {hasCelebration ? (
                   <View style={styles.cardActionRow}>
                     <View style={[styles.cardActionButton, { borderColor: "#FBCFE8" }]}>
-                      <Text style={[styles.cardActionButtonText, { color: "#DB2777" }]}>Confetti drop active</Text>
+                      <Text style={[styles.cardActionButtonText, { color: "#DB2777" }]}>Resilience Master</Text>
                       <Ionicons name="sparkles" size={14} color="#EC4899" />
                     </View>
                   </View>
