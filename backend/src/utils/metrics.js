@@ -40,12 +40,47 @@ const feedbackSubmittedTotal = new client.Counter({
   help: "Total feedback messages submitted.",
 });
 
+const authEventsTotal = new client.Counter({
+  name: "reflectly_auth_events_total",
+  help: "Authentication-related events in the Reflectly backend.",
+  labelNames: ["action", "status"],
+});
+
+const adminEventsTotal = new client.Counter({
+  name: "reflectly_admin_events_total",
+  help: "Admin-related events in the Reflectly backend.",
+  labelNames: ["action", "status"],
+});
+
+const tagMutationsTotal = new client.Counter({
+  name: "reflectly_tag_mutations_total",
+  help: "Tag create/update/delete operations.",
+  labelNames: ["action", "status"],
+});
+
+const chatRequestsTotal = new client.Counter({
+  name: "reflectly_chat_requests_total",
+  help: "Chat requests handled by the Reflectly backend.",
+  labelNames: ["status"],
+});
+
+const transcriptionRequestsTotal = new client.Counter({
+  name: "reflectly_transcription_requests_total",
+  help: "Audio transcription requests handled by the Reflectly backend.",
+  labelNames: ["status"],
+});
+
 register.registerMetric(httpRequestsTotal);
 register.registerMetric(httpRequestDurationSeconds);
 register.registerMetric(diaryEntriesCreatedTotal);
 register.registerMetric(diaryEntriesUpdatedTotal);
 register.registerMetric(diaryEntriesDeletedTotal);
 register.registerMetric(feedbackSubmittedTotal);
+register.registerMetric(authEventsTotal);
+register.registerMetric(adminEventsTotal);
+register.registerMetric(tagMutationsTotal);
+register.registerMetric(chatRequestsTotal);
+register.registerMetric(transcriptionRequestsTotal);
 
 function normalizeRoute(route) {
   const raw = String(route || "unknown").split("?")[0];
@@ -81,6 +116,39 @@ function incrementFeedbackSubmitted() {
   feedbackSubmittedTotal.inc();
 }
 
+function incrementAuthEvent(action, status = "success") {
+  authEventsTotal.inc({
+    action: String(action || "unknown"),
+    status: String(status || "success"),
+  });
+}
+
+function incrementAdminEvent(action, status = "success") {
+  adminEventsTotal.inc({
+    action: String(action || "unknown"),
+    status: String(status || "success"),
+  });
+}
+
+function incrementTagMutation(action, status = "success") {
+  tagMutationsTotal.inc({
+    action: String(action || "unknown"),
+    status: String(status || "success"),
+  });
+}
+
+function incrementChatRequest(status = "success") {
+  chatRequestsTotal.inc({
+    status: String(status || "success"),
+  });
+}
+
+function incrementTranscriptionRequest(status = "success") {
+  transcriptionRequestsTotal.inc({
+    status: String(status || "success"),
+  });
+}
+
 module.exports = {
   register,
   recordHttpMetrics,
@@ -88,4 +156,9 @@ module.exports = {
   incrementDiaryEntriesUpdated,
   incrementDiaryEntriesDeleted,
   incrementFeedbackSubmitted,
+  incrementAuthEvent,
+  incrementAdminEvent,
+  incrementTagMutation,
+  incrementChatRequest,
+  incrementTranscriptionRequest,
 };

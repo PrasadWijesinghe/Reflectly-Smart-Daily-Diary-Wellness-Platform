@@ -1,4 +1,5 @@
 const prisma = require("../utils/prisma");
+const { incrementChatRequest } = require("../utils/metrics");
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
 const RAW_GEMINI_MODEL =
@@ -58,10 +59,12 @@ async function createChatReply(req, res) {
     const { message, history } = req.body;
 
     if (!message || !message.trim()) {
+      incrementChatRequest("failure");
       return res.status(400).json({ error: "Message is required." });
     }
 
     if (!GEMINI_API_KEY) {
+      incrementChatRequest("failure");
       return res.status(500).json({
         error: "GEMINI_API_KEY is not configured on the backend.",
       });
@@ -128,11 +131,13 @@ async function createChatReply(req, res) {
       
       // Check for image input error and return friendly message
       if (apiError.includes("image input") || apiError.includes("does not support image")) {
+        incrementChatRequest("failure");
         return res.status(400).json({ 
           error: "Image support is not available yet. Please send text messages only." 
         });
       }
       
+      incrementChatRequest("failure");
       return res.status(response.status).json({ error: apiError });
     }
 
@@ -142,12 +147,15 @@ async function createChatReply(req, res) {
       .trim();
 
     if (!reply) {
+      incrementChatRequest("failure");
       return res.status(502).json({ error: "The chat response was empty." });
     }
 
+    incrementChatRequest("success");
     res.json({ reply });
   } catch (error) {
     console.error("CreateChatReply error:", error);
+    incrementChatRequest("failure");
     res.status(500).json({ error: "Failed to generate chat reply." });
   }
 }

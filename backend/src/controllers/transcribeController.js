@@ -2,6 +2,7 @@ const { pipeline, env } = require("@xenova/transformers");
 const fs = require("fs");
 const path = require("path");
 const audioDecode = require("audio-decode");
+const { incrementTranscriptionRequest } = require("../utils/metrics");
 
 env.allowLocalModels = false;
 
@@ -81,9 +82,11 @@ const transcribe = async (req, res) => {
     });
 
     console.log(`[Transcribe] Done: "${result.text}"`);
+    incrementTranscriptionRequest("success");
     res.json({ text: result.text });
   } catch (err) {
     console.error("[Transcribe] Error:", err.message);
+    incrementTranscriptionRequest("failure");
     res.status(500).json({ error: "Transcription failed. Please try again." });
   }
 };
