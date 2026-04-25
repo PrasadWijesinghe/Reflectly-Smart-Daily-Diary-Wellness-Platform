@@ -60,9 +60,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (storedToken && storedUser) {
         const parsedUser = JSON.parse(storedUser);
-        setToken(storedToken);
-        setUser(parsedUser);
-        setIsAppUnlocked(!parsedUser?.appLockEnabled);
+
+        try {
+          const res = await fetchWithTimeout(`${getApiUrl()}/auth/me`, {
+            headers: { Authorization: `Bearer ${storedToken}` },
+          });
+
+          if (!res.ok) {
+            throw new Error("Stored session is no longer valid.");
+          }
+
+          const data = await res.json();
+          const nextUser = {
+            ...parsedUser,
+            ...data.user,
+          };
+
+          await AsyncStorage.setItem("user", JSON.stringify(nextUser));
+          setToken(storedToken);
+          setUser(nextUser);
+          setIsAppUnlocked(!nextUser?.appLockEnabled);
+        } catch (_error) {
+          await AsyncStorage.removeItem("token");
+          await AsyncStorage.removeItem("user");
+          setToken(null);
+          setUser(null);
+          setIsAppUnlocked(true);
+        }
       }
     } catch (err) {
       console.error("Failed to load stored auth:", err);

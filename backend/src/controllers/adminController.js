@@ -111,6 +111,32 @@ async function getTags(req, res) {
   }
 }
 
+async function createTag(req, res) {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const icon = String(req.body?.icon || "").trim();
+    const color = String(req.body?.color || "").trim();
+
+    if (!name || !icon || !color) {
+      return res.status(400).json({ error: "Name, icon, and color are required." });
+    }
+
+    const existing = await prisma.tag.findUnique({ where: { name } });
+    if (existing) {
+      return res.status(409).json({ error: "Tag already exists." });
+    }
+
+    const tag = await prisma.tag.create({
+      data: { name, icon, color },
+    });
+
+    return res.status(201).json({ message: "Tag created.", tag });
+  } catch (err) {
+    console.error("Create admin tag error:", err);
+    return res.status(500).json({ error: "Failed to create tag." });
+  }
+}
+
 async function getFeedbacks(req, res) {
   try {
     const feedbacks = await prisma.feedback.findMany({
@@ -128,5 +154,6 @@ module.exports = {
   login,
   getUsers,
   getTags,
+  createTag,
   getFeedbacks,
 };

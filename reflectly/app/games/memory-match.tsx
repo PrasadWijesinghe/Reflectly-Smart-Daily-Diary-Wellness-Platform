@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -10,6 +9,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { getGameBestScore, saveGameBestScore } from "../../utils/gameScores";
+
+const GAME_ID = "memory-match";
 
 type Card = {
   id: string;
@@ -42,8 +45,28 @@ export default function MemoryMatchScreen() {
   const [deck, setDeck] = useState<Card[]>(() => buildDeck());
   const [flippedIds, setFlippedIds] = useState<string[]>([]);
   const [moves, setMoves] = useState(0);
-  const [bestScore, setBestScore] = useState<number | null>(null);
+  const [bestScore, setBestScore] = useState<number>(0);
   const [isLocked, setIsLocked] = useState(false);
+  const [score, setScore] = useState(0);
+  const [showStart, setShowStart] = useState(true);
+
+  useEffect(() => {
+    loadBestScore();
+  }, []);
+
+  async function loadBestScore() {
+    const savedScore = await getGameBestScore(GAME_ID);
+    setBestScore(savedScore);
+  }
+
+  function startGame() {
+    setShowStart(false);
+    setDeck(buildDeck());
+    setFlippedIds([]);
+    setMoves(0);
+    setIsLocked(false);
+    setScore(0);
+  }
 
   const matchedCount = useMemo(() => deck.filter((card) => card.matched).length, [deck]);
   const hasWon = matchedCount === deck.length;
@@ -83,9 +106,23 @@ export default function MemoryMatchScreen() {
 
   useEffect(() => {
     if (hasWon) {
-      setBestScore((prev) => (prev === null || moves < prev ? moves : prev));
+      const newScore = Math.max(0, 1000 - moves * 50);
+      setScore(newScore);
+      const currentBest = bestScore;
+      if (newScore > currentBest) {
+        setBestScore(newScore);
+        saveGameBestScore(GAME_ID, newScore);
+      }
     }
-  }, [hasWon, moves]);
+  }, [hasWon, moves, bestScore]);
+
+  function resetGame() {
+    setDeck(buildDeck());
+    setFlippedIds([]);
+    setMoves(0);
+    setIsLocked(false);
+    setScore(0);
+  }
 
   function handlePressCard(cardId: string) {
     if (isLocked) return;
@@ -96,13 +133,6 @@ export default function MemoryMatchScreen() {
     if (flippedIds.length >= 2) return;
 
     setFlippedIds((prev) => [...prev, cardId]);
-  }
-
-  function resetGame() {
-    setDeck(buildDeck());
-    setFlippedIds([]);
-    setMoves(0);
-    setIsLocked(false);
   }
 
   function handleBack() {
@@ -117,17 +147,32 @@ export default function MemoryMatchScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={["#2563EB", "#1D4ED8", "#1E3A8A"]} style={styles.header}>
+      <LinearGradient colors={["#8B5CF6", "#6D28D9", "#4C1D95"]} style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
+        <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>Memory Match</Text>
-          <Text style={styles.headerSubtitle}>Light focus training with calm study icons</Text>
         </View>
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {showStart ? (
+        <View style={styles.startScreen}>
+          <Text style={{ fontSize: 70 }}>🧠</Text>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsTitle}>How to Play</Text>
+            <Text style={styles.instructionsText}>
+              Flip two cards and find matching pairs!{"\n"}
+              Fewer moves = higher score.
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.startButton} onPress={startGame} activeOpacity={0.85}>
+            <Ionicons name="play" size={24} color="#FFFFFF" />
+            <Text style={styles.startButtonText}>Start</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+      <View style={styles.content}>
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
             <View style={styles.metricCard}>
@@ -136,11 +181,11 @@ export default function MemoryMatchScreen() {
             </View>
             <View style={styles.metricCard}>
               <Text style={styles.metricValue}>{matchedCount / 2}</Text>
-              <Text style={styles.metricLabel}>Pairs found</Text>
+              <Text style={styles.metricLabel}>Pairs</Text>
             </View>
             <View style={styles.metricCard}>
-              <Text style={styles.metricValue}>{bestScore ?? "-"}</Text>
-              <Text style={styles.metricLabel}>Best</Text>
+              <Text style={styles.metricValue}>{score > 0 ? score : bestScore}</Text>
+              <Text style={styles.metricLabel}>Score</Text>
             </View>
           </View>
 
@@ -152,30 +197,33 @@ export default function MemoryMatchScreen() {
           </View>
         </View>
 
-        <View style={styles.grid}>
-          {deck.map((card) => {
-            const isFlipped = card.matched || flippedIds.includes(card.id);
+        <View style={styles.gridContainer}>
+          <View style={styles.grid}>
+            {deck.map((card) => {
+              const isFlipped = card.matched || flippedIds.includes(card.id);
 
-            return (
-              <TouchableOpacity
-                key={card.id}
-                style={[styles.card, isFlipped ? styles.cardOpen : styles.cardClosed]}
-                onPress={() => handlePressCard(card.id)}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.cardEmoji, isFlipped && styles.cardEmojiOpen]}>
-                  {isFlipped ? card.emoji : "?"}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+              return (
+                <TouchableOpacity
+                  key={card.id}
+                  style={[styles.card, isFlipped ? styles.cardOpen : styles.cardClosed]}
+                  onPress={() => handlePressCard(card.id)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.cardEmoji, isFlipped && styles.cardEmojiOpen]}>
+                    {isFlipped ? card.emoji : "?"}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         <TouchableOpacity style={styles.resetButton} onPress={resetGame} activeOpacity={0.85}>
           <Ionicons name="refresh" size={18} color="#FFFFFF" />
           <Text style={styles.resetButtonText}>{hasWon ? "Play Again" : "Shuffle Again"}</Text>
         </TouchableOpacity>
-      </ScrollView>
+        </View>
+      )}
     </View>
   );
 }
@@ -184,22 +232,30 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F8FF" },
   header: { paddingTop: 54, paddingBottom: 24, paddingHorizontal: 20, flexDirection: "row", alignItems: "center" },
   backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center", marginRight: 14 },
+  headerCopy: { flex: 1 },
   headerTitle: { fontSize: 24, fontWeight: "700", color: "#FFFFFF" },
-  headerSubtitle: { fontSize: 13, color: "rgba(255,255,255,0.82)", marginTop: 4 },
-  content: { padding: 20, paddingBottom: 32 },
-  summaryCard: { backgroundColor: "#FFFFFF", borderRadius: 22, padding: 18, marginBottom: 18 },
+  headerSubtitle: { fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 4 },
+  content: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+  summaryCard: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, marginBottom: 12 },
   summaryRow: { flexDirection: "row", gap: 10 },
-  metricCard: { flex: 1, backgroundColor: "#EFF6FF", borderRadius: 16, paddingVertical: 16, alignItems: "center" },
-  metricValue: { fontSize: 22, fontWeight: "700", color: "#1D4ED8" },
-  metricLabel: { fontSize: 12, color: "#64748B", marginTop: 4 },
-  statusBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F8FAFC", borderRadius: 16, padding: 14, marginTop: 14 },
-  statusText: { flex: 1, fontSize: 13, lineHeight: 20, color: "#334155" },
-  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 12 },
-  card: { width: "31%", aspectRatio: 1, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  metricCard: { flex: 1, backgroundColor: "#EFF6FF", borderRadius: 14, paddingVertical: 12, alignItems: "center" },
+  metricValue: { fontSize: 20, fontWeight: "700", color: "#1D4ED8" },
+  metricLabel: { fontSize: 11, color: "#64748B", marginTop: 2 },
+  statusBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F8FAFC", borderRadius: 14, padding: 12, marginTop: 10 },
+  statusText: { flex: 1, fontSize: 12, color: "#334155" },
+  gridContainer: { flex: 1, justifyContent: "center", paddingVertical: 8, paddingHorizontal: 4 },
+  grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 10 },
+  card: { width: "29%", aspectRatio: 1, borderRadius: 16, backgroundColor: "#1D4ED8", alignItems: "center", justifyContent: "center" },
   cardClosed: { backgroundColor: "#1D4ED8" },
   cardOpen: { backgroundColor: "#FFFFFF", borderWidth: 2, borderColor: "#BFDBFE" },
-  cardEmoji: { fontSize: 32, fontWeight: "700", color: "#FFFFFF" },
+  cardEmoji: { fontSize: 36, fontWeight: "700", color: "#FFFFFF" },
   cardEmojiOpen: { color: "#1E3A8A" },
-  resetButton: { marginTop: 20, backgroundColor: "#2563EB", borderRadius: 18, paddingVertical: 16, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
+  resetButton: { marginBottom: 16, backgroundColor: "#2563EB", borderRadius: 16, paddingVertical: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   resetButtonText: { fontSize: 15, fontWeight: "700", color: "#FFFFFF" },
+  startScreen: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
+  instructionsCard: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 24, alignItems: "center", width: "100%" },
+  instructionsTitle: { fontSize: 20, fontWeight: "700", color: "#6D28D9", marginBottom: 10 },
+  instructionsText: { fontSize: 14, color: "#6B7280", textAlign: "center" },
+  startButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#8B5CF6", borderRadius: 16, paddingVertical: 14, paddingHorizontal: 28, marginTop: 16, gap: 8 },
+  startButtonText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
 });

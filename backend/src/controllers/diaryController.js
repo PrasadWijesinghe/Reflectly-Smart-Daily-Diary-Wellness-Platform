@@ -1,14 +1,12 @@
 const prisma = require("../utils/prisma");
-<<<<<<< HEAD
 const {
   incrementDiaryEntriesCreated,
   incrementDiaryEntriesUpdated,
   incrementDiaryEntriesDeleted,
 } = require("../utils/metrics");
-=======
 const { generateAISummary } = require("../utils/gemini");
 const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
->>>>>>> 9155e1b779a4e757d38b158c046e3bf87a6cc746
+
 
 function generateSummary(content) {
   const trimmed = content.trim();
@@ -326,8 +324,12 @@ async function getEntries(req, res) {
           userId: req.user.userId,
           date: { gte: d, lt: nextDay },
         },
-        include: { tags: true },
+        include: { tags: true, images: { orderBy: { order: 'asc' } } },
       });
+
+      if (entry) {
+        entry.images = entry.images.map((img) => ({ ...img, url: `/uploads/${img.filename}` }));
+      }
 
       return res.json({ entry: entry || null });
     }
@@ -335,10 +337,15 @@ async function getEntries(req, res) {
     const entries = await prisma.dailyDiary.findMany({
       where: { userId: req.user.userId },
       orderBy: { date: "desc" },
-      include: { tags: true },
+      include: { tags: true, images: { orderBy: { order: 'asc' } } },
     });
 
-    res.json({ entries });
+    const mappedEntries = entries.map((e) => ({
+      ...e,
+      images: e.images.map((img) => ({ ...img, url: `/uploads/${img.filename}` })),
+    }));
+
+    res.json({ entries: mappedEntries });
   } catch (err) {
     console.error("GetEntries error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -357,6 +364,11 @@ async function createEntry(req, res) {
     console.log(`[AI Summary] Generating summary for user ${req.user.userId}, date ${normalizedDate}`);
     const summary = await generateAISummary(content);
     console.log(`[AI Summary] Generated: "${summary}"`);
+
+    console.log(`[AI Mood] Analyzing mood for user ${req.user.userId}`);
+    const moodScore = await analyzeMoodScore(content);
+    console.log(`[AI Mood] Result: ${moodScore}`);
+
     const tagConnect =
       tagIds && tagIds.length > 0
         ? { connect: tagIds.map((id) => ({ id })) }
@@ -379,6 +391,7 @@ async function createEntry(req, res) {
       data: {
         content,
         summary,
+        moodScore,
         date: normalizedDate,
         userId: req.user.userId,
         ...(tagConnect && { tags: tagConnect }),
@@ -386,12 +399,9 @@ async function createEntry(req, res) {
       include: { tags: true },
     });
 
-<<<<<<< HEAD
-    incrementDiaryEntriesCreated();
-=======
     await regenerateWeekSummary(req.user.userId, normalizedDate);
 
->>>>>>> 9155e1b779a4e757d38b158c046e3bf87a6cc746
+
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {
     if (err.code === "P2002") {
@@ -408,12 +418,14 @@ async function getEntry(req, res) {
   try {
     const entry = await prisma.dailyDiary.findFirst({
       where: { id: parseInt(req.params.id, 10), userId: req.user.userId },
-      include: { tags: true },
+      include: { tags: true, images: { orderBy: { order: 'asc' } } },
     });
 
     if (!entry) {
       return res.status(404).json({ error: "Entry not found." });
     }
+
+    entry.images = entry.images.map((img) => ({ ...img, url: `/uploads/${img.filename}` }));
 
     res.json({ entry });
   } catch (err) {
@@ -440,6 +452,10 @@ async function updateEntry(req, res) {
       console.log(`[AI Summary] Generating summary for entry ${existing.id}, user ${req.user.userId}`);
       updateData.summary = await generateAISummary(content);
       console.log(`[AI Summary] Generated: "${updateData.summary}"`);
+      
+      console.log(`[AI Mood] Analyzing mood for entry ${existing.id}`);
+      updateData.moodScore = await analyzeMoodScore(content);
+      console.log(`[AI Mood] Result: ${updateData.moodScore}`);
     }
     if (tagIds !== undefined) {
       updateData.tags = {
@@ -453,15 +469,101 @@ async function updateEntry(req, res) {
       include: { tags: true },
     });
 
-<<<<<<< HEAD
-    incrementDiaryEntriesUpdated();
-=======
     await regenerateWeekSummary(req.user.userId, existing.date);
 
->>>>>>> 9155e1b779a4e757d38b158c046e3bf87a6cc746
+
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
     console.error("UpdateEntry error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+}
+
+async function getMonthlyMoods(req, res) {
+  try {
+    const { year, month } = req.query;
+
+    if (!year || !month) {
+      return res.status(400).json({ error: "Year and month are required." });
+    }
+
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+
+    const start = new Date(Date.UTC(y, m - 1, 1));
+    const end = new Date(Date.UTC(y, m, 1));
+
+    const entries = await prisma.dailyDiary.findMany({
+      where: {
+        userId: req.user.userId,
+        date: { gte: start, lt: end },
+      },
+      orderBy: { date: "asc" },
+    });
+
+    const moods = entries.map((entry) => ({
+      date: new Date(entry.date).toISOString().split("T")[0],
+      moodScore: entry.moodScore,
+      moodEmoji: getMoodEmoji(entry),
+      summary: entry.summary,
+      id: entry.id,
+    }));
+
+    res.json({ month: `${y}-${String(m).padStart(2, "0")}`, moods });
+  } catch (err) {
+    console.error("GetMonthlyMoods error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+}
+
+async function getEmotionalCloud(req, res) {
+  try {
+    const { year, month } = req.query;
+
+    if (!year || !month) {
+      return res.status(400).json({ error: "Year and month are required." });
+    }
+
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+
+    const start = new Date(Date.UTC(y, m - 1, 1));
+    const end = new Date(Date.UTC(y, m, 1));
+
+    console.log(`[Emotional Cloud] Fetching entries for user ${req.user.userId}, ${y}-${m}`);
+
+    const entries = await prisma.dailyDiary.findMany({
+      where: {
+        userId: req.user.userId,
+        date: { gte: start, lt: end },
+      },
+      select: {
+        content: true,
+        summary: true,
+      },
+    });
+
+    if (entries.length === 0) {
+      return res.json({
+        month: `${y}-${String(m).padStart(2, "0")}`,
+        words: [],
+        aiInsight: "You haven't written any diary entries this month yet. Start writing to see your emotional patterns! 🖋️",
+      });
+    }
+
+    // Combine all entries into one text block for AI analysis
+    const entriesText = entries
+      .map((e) => `${e.summary || ""} ${e.content || ""}`)
+      .join("\n\n---\n\n");
+
+    const analysis = await analyzeEmotionalCloud(entriesText);
+
+    res.json({
+      month: `${y}-${String(m).padStart(2, "0")}`,
+      ...analysis,
+    });
+  } catch (err) {
+    console.error("GetEmotionalCloud error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 }
@@ -478,12 +580,9 @@ async function deleteEntry(req, res) {
 
     await prisma.dailyDiary.delete({ where: { id: existing.id } });
 
-<<<<<<< HEAD
-    incrementDiaryEntriesDeleted();
-=======
     await regenerateWeekSummary(req.user.userId, existing.date);
 
->>>>>>> 9155e1b779a4e757d38b158c046e3bf87a6cc746
+
     res.json({ message: "Entry deleted." });
   } catch (err) {
     console.error("DeleteEntry error:", err);
@@ -499,5 +598,8 @@ module.exports = {
   getEntryDates,
   getMoodTrend,
   getWeekMoods,
+  getMonthlyMoods,
+  getEmotionalCloud,
+  getAiInsights,
   updateEntry,
 };

@@ -125,6 +125,14 @@ async function createChatReply(req, res) {
 
     if (!response.ok) {
       const apiError = data?.error?.message || "Gemini request failed.";
+      
+      // Check for image input error and return friendly message
+      if (apiError.includes("image input") || apiError.includes("does not support image")) {
+        return res.status(400).json({ 
+          error: "Image support is not available yet. Please send text messages only." 
+        });
+      }
+      
       return res.status(response.status).json({ error: apiError });
     }
 

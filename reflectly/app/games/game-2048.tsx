@@ -1,7 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   PanResponder,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -11,6 +10,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { getGameBestScore, saveGameBestScore } from "../../utils/gameScores";
+
+const GAME_ID = "game-2048";
 
 type Board = number[][];
 type Direction = "up" | "down" | "left" | "right";
@@ -148,12 +151,36 @@ export default function Game2048Screen() {
   const [board, setBoard] = useState<Board>(() => createInitialBoard());
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(0);
+  const [hasWon, setHasWon] = useState(false);
+  const [showStart, setShowStart] = useState(true);
+
+  useEffect(() => {
+    loadBestScore();
+  }, []);
+
+  async function loadBestScore() {
+    const savedScore = await getGameBestScore(GAME_ID);
+    setBestScore(savedScore);
+  }
+
+  function startGame() {
+    setShowStart(false);
+    setBoard(createInitialBoard());
+    setScore(0);
+    setHasWon(false);
+  }
 
   const won = useMemo(() => board.some((row) => row.some((cell) => cell >= 2048)), [board]);
   const isGameOver = useMemo(() => !canMove(board), [board]);
 
+  useEffect(() => {
+    if (won && !hasWon) {
+      setHasWon(true);
+    }
+  }, [won, hasWon]);
+
   function handleMove(direction: Direction) {
-    if (isGameOver) return;
+    if (isGameOver || hasWon) return;
 
     const oriented = transformBoard(board, direction);
     const result = moveLeft(oriented);
@@ -166,12 +193,17 @@ export default function Game2048Screen() {
 
     setBoard(nextBoard);
     setScore(nextScore);
-    setBestScore((prev) => Math.max(prev, nextScore));
+    const currentBest = bestScore;
+    if (nextScore > currentBest) {
+      setBestScore(nextScore);
+      saveGameBestScore(GAME_ID, nextScore);
+    }
   }
 
   function resetGame() {
     setBoard(createInitialBoard());
     setScore(0);
+    setHasWon(false);
   }
 
   function handleBack() {
@@ -213,13 +245,29 @@ export default function Game2048Screen() {
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
+        <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>2048 Focus</Text>
-          <Text style={styles.headerSubtitle}>Merge tiles and let your brain lock into one task</Text>
         </View>
       </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {showStart ? (
+        <View style={styles.startScreen}>
+          <Text style={{ fontSize: 70 }}>🎮</Text>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsTitle}>How to Play</Text>
+            <Text style={styles.instructionsText}>
+              Swipe to merge tiles!{"\n"}
+              Reach 2048 to win!{"\n"}
+              Join numbers to double them.
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.startButton} onPress={startGame} activeOpacity={0.85}>
+            <Ionicons name="play" size={24} color="#FFFFFF" />
+            <Text style={styles.startButtonText}>Start</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+      <View style={styles.content}>
         <View style={styles.summaryRow}>
           <View style={styles.scoreCard}>
             <Text style={styles.scoreLabel}>Score</Text>
@@ -234,65 +282,76 @@ export default function Game2048Screen() {
         <View style={styles.statusCard}>
           <Ionicons
             name={won ? "trophy" : isGameOver ? "alert-circle" : "flash-outline"}
-            size={18}
+            size={16}
             color="#1D4ED8"
           />
           <Text style={styles.statusText}>
             {won
-              ? "You reached 2048. Keep going if you want a longer focus break."
+              ? "You reached 2048! Keep going for longer focus."
               : isGameOver
-                ? "No more moves left. Reset and try a calmer second round."
-                : "Swipe across the board to slide all tiles in one direction."}
+                ? "No more moves. Try again!"
+                : "Swipe to move tiles"}
           </Text>
         </View>
 
-        <View style={styles.board} {...panResponder.panHandlers}>
-          {board.map((row, rowIndex) => (
-            <View key={`row-${rowIndex}`} style={styles.boardRow}>
-              {row.map((value, columnIndex) => {
-                const tile = getTileStyle(value);
-                return (
-                  <View
-                    key={`${rowIndex}-${columnIndex}`}
-                    style={[styles.tile, { backgroundColor: tile.bg }]}
-                  >
-                    <Text style={[styles.tileText, { color: tile.color }, value >= 128 && styles.tileTextSmall]}>
-                      {value || ""}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          ))}
+        <View style={styles.boardContainer}>
+          <View style={styles.board} {...panResponder.panHandlers}>
+            {board.map((row, rowIndex) => (
+              <View key={`row-${rowIndex}`} style={styles.boardRow}>
+                {row.map((value, columnIndex) => {
+                  const tile = getTileStyle(value);
+                  return (
+                    <View
+                      key={`${rowIndex}-${columnIndex}`}
+                      style={[styles.tile, { backgroundColor: tile.bg }]}
+                    >
+                      <Text style={[styles.tileText, { color: tile.color }, value >= 128 && styles.tileTextSmall]}>
+                        {value || ""}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
         </View>
 
         <TouchableOpacity style={styles.resetButton} onPress={resetGame} activeOpacity={0.85}>
           <Ionicons name="refresh" size={18} color="#1D4ED8" />
           <Text style={styles.resetButtonText}>New Board</Text>
         </TouchableOpacity>
-      </ScrollView>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#EAF2FF" },
-  header: { paddingTop: 54, paddingBottom: 24, paddingHorizontal: 20, flexDirection: "row", alignItems: "center" },
+  header: { paddingTop: 54, paddingBottom: 20, paddingHorizontal: 20, flexDirection: "row", alignItems: "center" },
   backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.16)", alignItems: "center", justifyContent: "center", marginRight: 14 },
+  headerCopy: { flex: 1 },
   headerTitle: { fontSize: 24, fontWeight: "700", color: "#FFFFFF" },
-  headerSubtitle: { fontSize: 13, color: "rgba(255,255,255,0.82)", marginTop: 4 },
-  content: { padding: 20, paddingBottom: 32 },
-  summaryRow: { flexDirection: "row", gap: 12 },
-  scoreCard: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 18, paddingVertical: 18, paddingHorizontal: 16 },
-  scoreLabel: { fontSize: 12, fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.8 },
-  scoreValue: { fontSize: 26, fontWeight: "700", color: "#0F172A", marginTop: 8 },
-  statusCard: { flexDirection: "row", gap: 10, alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 18, padding: 16, marginTop: 16 },
-  statusText: { flex: 1, fontSize: 13, lineHeight: 20, color: "#334155" },
-  board: { backgroundColor: "#CBD5E1", borderRadius: 22, padding: 12, marginTop: 18, gap: 10 },
-  boardRow: { flexDirection: "row", gap: 10 },
-  tile: { flex: 1, aspectRatio: 1, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  tileText: { fontSize: 28, fontWeight: "800" },
-  tileTextSmall: { fontSize: 22 },
-  resetButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#FFFFFF", borderRadius: 18, paddingVertical: 16, marginTop: 18 },
-  resetButtonText: { fontSize: 15, fontWeight: "700", color: "#1D4ED8" },
+  headerSubtitle: { fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 2 },
+  content: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
+  summaryRow: { flexDirection: "row", gap: 10 },
+  scoreCard: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center" },
+  scoreLabel: { fontSize: 11, fontWeight: "700", color: "#64748B", textTransform: "uppercase" },
+  scoreValue: { fontSize: 22, fontWeight: "700", color: "#0F172A", marginTop: 4 },
+  statusCard: { flexDirection: "row", gap: 8, alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 14, padding: 12, marginTop: 10 },
+  statusText: { flex: 1, fontSize: 12, color: "#334155" },
+  boardContainer: { flex: 1, justifyContent: "center", paddingVertical: 10 },
+  board: { backgroundColor: "#CBD5E1", borderRadius: 18, padding: 10, gap: 8 },
+  boardRow: { flexDirection: "row", gap: 8 },
+  tile: { flex: 1, aspectRatio: 1, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  tileText: { fontSize: 26, fontWeight: "800" },
+  tileTextSmall: { fontSize: 20 },
+  resetButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#FFFFFF", borderRadius: 14, paddingVertical: 12, marginBottom: 16 },
+  resetButtonText: { fontSize: 14, fontWeight: "700", color: "#1D4ED8" },
+  startScreen: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
+  instructionsCard: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 24, alignItems: "center", width: "100%" },
+  instructionsTitle: { fontSize: 20, fontWeight: "700", color: "#1E3A8A", marginBottom: 10 },
+  instructionsText: { fontSize: 14, color: "#6B7280", textAlign: "center" },
+  startButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#2563EB", borderRadius: 16, paddingVertical: 14, paddingHorizontal: 28, marginTop: 16, gap: 8 },
+  startButtonText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
 });

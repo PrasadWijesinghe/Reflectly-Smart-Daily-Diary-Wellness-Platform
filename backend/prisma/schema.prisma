@@ -7,13 +7,16 @@ generator client {
 }
 
 model User {
-  id        Int          @id @default(autoincrement())
-  name      String
-  email     String       @unique
-  password  String
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  diaries   DailyDiary[]
+  id             Int          @id @default(autoincrement())
+  name           String
+  email          String       @unique
+  password       String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  appLockEnabled Boolean      @default(false)
+  appLockType    String?
+  appLockHash    String?
+  diaries        DailyDiary[]
 }
 
 model DailyDiary {
@@ -21,18 +24,32 @@ model DailyDiary {
   date      DateTime
   content   String
   summary   String
+  moodScore Int      @default(50) // 50 = Neutral
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tags      Tag[]
+  images    DiaryImage[]
 
   @@unique([userId, date])
 }
 
+model DiaryImage {
+  id           Int        @id @default(autoincrement())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  order        Int
+  diaryId      Int
+  diary        DailyDiary @relation(fields: [diaryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+}
+
 model Tag {
-  id      Int           @id @default(autoincrement())
-  name    String        @unique
+  id      Int          @id @default(autoincrement())
+  name    String       @unique
   icon    String
   color   String
   diaries DailyDiary[]
@@ -45,21 +62,21 @@ model Feedback {
 }
 
 model WeeklySummary {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  year        Int
-  month       Int
-  weekNumber  Int
-  weekStart   DateTime
-  weekEnd     DateTime
-  dayCount    Int
-  shortSummary String  @db.Text
-  fullSummary String  @db.Text
-  topTags     String   @db.Text
-  mood        String
-  entryCount  Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  year         Int
+  month        Int
+  weekNumber   Int
+  weekStart    DateTime
+  weekEnd      DateTime
+  dayCount     Int
+  shortSummary String   @db.Text
+  fullSummary  String   @db.Text
+  topTags      String   @db.Text
+  mood         String
+  entryCount   Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([userId, year, month, weekNumber])
   @@index([userId])

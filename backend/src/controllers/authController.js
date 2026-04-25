@@ -401,6 +401,8 @@ const getMe = async (req, res) => {
         name: true,
         email: true,
         createdAt: true,
+        appLockEnabled: true,
+        appLockType: true,
       },
     });
 
