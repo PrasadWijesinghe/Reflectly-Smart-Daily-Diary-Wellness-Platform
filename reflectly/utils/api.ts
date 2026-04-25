@@ -61,6 +61,10 @@ export const getApiUrl = (): string => {
   return DEFAULT_API_URL;
 };
 
+export function getImageUrl(imagePath: string): string {
+  return getApiUrl().replace('/api', '') + imagePath;
+}
+
 export async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit = {},

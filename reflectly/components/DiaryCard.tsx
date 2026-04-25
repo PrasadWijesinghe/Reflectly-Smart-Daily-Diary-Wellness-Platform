@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { DeviceEventEmitter, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getApiUrl } from "../utils/api";
+import { getApiUrl, getImageUrl } from "../utils/api";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import ConfirmModal from "./ConfirmModal";
 import { DIARY_UPDATED_EVENT } from "../utils/notifications";
+import ImageThumbnailStrip from "./ImageThumbnailStrip";
+import FullscreenImageViewer from "./FullscreenImageViewer";
 
 type Tag = {
   id: number;
@@ -13,12 +15,23 @@ type Tag = {
   color: string;
 };
 
+type DiaryImage = {
+  id: number;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  order: number;
+  url: string;
+};
+
 type DiaryEntry = {
   id: number;
   date: string;
   content: string;
   summary: string;
   tags: Tag[];
+  images: DiaryImage[];
 };
 
 const dayNames = [
@@ -43,6 +56,8 @@ type Props = {
 
 export default function DiaryCard({ entry, token, onEdit, onDelete }: Props) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   const handleConfirmDelete = async () => {
     setShowDeleteModal(false);
@@ -96,7 +111,27 @@ export default function DiaryCard({ entry, token, onEdit, onDelete }: Props) {
             ))}
           </View>
         )}
+
+        {entry.images && entry.images.length > 0 && (
+          <ImageThumbnailStrip
+            images={entry.images}
+            editMode={false}
+            onPress={(index) => {
+              setViewerIndex(index);
+              setViewerVisible(true);
+            }}
+          />
+        )}
       </View>
+
+      {entry.images && entry.images.length > 0 && (
+        <FullscreenImageViewer
+          visible={viewerVisible}
+          images={entry.images.map((img) => getImageUrl(img.url))}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerVisible(false)}
+        />
+      )}
 
       <ConfirmModal
         visible={showDeleteModal}
