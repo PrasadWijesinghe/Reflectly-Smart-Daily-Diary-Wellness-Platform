@@ -11,7 +11,7 @@ import "./global.css";
 function GlobalMiniPlayer() {
   const router = useRouter();
   const { currentSong, isPlaying, togglePlayPause, nextSong, stopSong } = useMusic();
-  
+
   if (!currentSong) {
     return null;
   }
@@ -23,15 +23,19 @@ function GlobalMiniPlayer() {
 
   return (
     <View style={styles.miniPlayerWrapper}>
-      <TouchableOpacity 
-        style={styles.miniPlayer} 
+      <TouchableOpacity
+        style={styles.miniPlayer}
         onPress={() => router.push("/music")}
         activeOpacity={0.9}
       >
         <Image source={{ uri: currentSong.artwork }} style={styles.miniArtwork} />
         <View style={styles.miniInfo}>
-          <Text style={styles.miniTitle} numberOfLines={1}>{currentSong.title}</Text>
-          <Text style={styles.miniArtist} numberOfLines={1}>{currentSong.artist}</Text>
+          <Text style={styles.miniTitle} numberOfLines={1}>
+            {currentSong.title}
+          </Text>
+          <Text style={styles.miniArtist} numberOfLines={1}>
+            {currentSong.artist}
+          </Text>
         </View>
         <View style={styles.miniControls}>
           <TouchableOpacity onPress={togglePlayPause} style={styles.miniButton}>
@@ -60,15 +64,11 @@ export default function RootLayout() {
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="viewall-diary" />
-            <Stack.Screen name="music" />
+              <Stack.Screen name="music" />
             </Stack>
             <GlobalMiniPlayer />
             <AppLockGate />
           </>
-<<<<<<< HEAD
-=======
-
->>>>>>> 14a5bc64478bc5c3d69bce8ea00355b968c05dc9
         </MusicProvider>
       </AuthProvider>
     </ThemeProvider>
@@ -99,7 +99,14 @@ const styles = StyleSheet.create({
   miniTitle: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
   miniArtist: { fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 2 },
   miniControls: { flexDirection: "row", gap: 8 },
-  miniButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
+  miniButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   closeButton: {
     position: "absolute",
     top: -8,

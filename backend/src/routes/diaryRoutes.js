@@ -8,7 +8,6 @@ const {
   getWeekMoods,
   updateEntry,
   deleteEntry,
-  getWeeklyEntries,
   getMonthlyMoods,
   getAiInsights,
 } = require("../controllers/diaryController");

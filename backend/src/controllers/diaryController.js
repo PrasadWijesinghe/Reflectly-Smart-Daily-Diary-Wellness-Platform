@@ -1,21 +1,19 @@
 const prisma = require("../utils/prisma");
-<<<<<<< HEAD
-const { generateAISummary } = require("../utils/gemini");
-const { regenerateWeekSummary } = require("./weeklyController");
-=======
-
->>>>>>> 14a5bc64478bc5c3d69bce8ea00355b968c05dc9
+const {
+  analyzeEmotionalCloud,
+  analyzeMoodScore,
+  generateAISummary,
+  generateAIInsightsPanel,
+  getCachedInsightsPanel,
+  invalidateInsightsPanelCache,
+  setCachedInsightsPanel,
+} = require("../utils/gemini");
 const {
   incrementDiaryEntriesCreated,
   incrementDiaryEntriesUpdated,
   incrementDiaryEntriesDeleted,
 } = require("../utils/metrics");
-<<<<<<< HEAD
-=======
-const { generateAISummary } = require("../utils/gemini");
-const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
-
->>>>>>> 14a5bc64478bc5c3d69bce8ea00355b968c05dc9
+const { regenerateWeekSummary } = require("./weeklyController");
 
 function generateSummary(content) {
   const trimmed = content.trim();
@@ -593,11 +591,7 @@ async function createEntry(req, res) {
 
     incrementDiaryEntriesCreated();
     await regenerateWeekSummary(req.user.userId, normalizedDate);
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 14a5bc64478bc5c3d69bce8ea00355b968c05dc9
+    invalidateInsightsPanelCache(`insights:${req.user.userId}:`);
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {
     if (err.code === "P2002") {
@@ -667,11 +661,7 @@ async function updateEntry(req, res) {
 
     incrementDiaryEntriesUpdated();
     await regenerateWeekSummary(req.user.userId, existing.date);
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 14a5bc64478bc5c3d69bce8ea00355b968c05dc9
+    invalidateInsightsPanelCache(`insights:${req.user.userId}:`);
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
     console.error("UpdateEntry error:", err);
@@ -782,11 +772,7 @@ async function deleteEntry(req, res) {
 
     incrementDiaryEntriesDeleted();
     await regenerateWeekSummary(req.user.userId, existing.date);
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 14a5bc64478bc5c3d69bce8ea00355b968c05dc9
+    invalidateInsightsPanelCache(`insights:${req.user.userId}:`);
     res.json({ message: "Entry deleted." });
   } catch (err) {
     console.error("DeleteEntry error:", err);

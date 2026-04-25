@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Animated, Easing } from "react-native";
-import LottieView from "lottie-react-native";
+import { View, Text, StyleSheet, Animated, Easing, Platform } from "react-native";
 
 type Variant = "loading" | "thinking" | "empty" | "success";
 
@@ -40,6 +39,16 @@ const toneStyles = {
     accent: "#F59E0B",
   },
 } as const;
+
+let LottieView: any = null;
+
+if (Platform.OS !== "web") {
+  try {
+    LottieView = eval("require")("lottie-react-native").default;
+  } catch (error) {
+    console.warn("[DiaryStateLottie] lottie-react-native is not installed yet.", error);
+  }
+}
 
 export default function DiaryStateLottie({
   variant,
@@ -157,18 +166,37 @@ export default function DiaryStateLottie({
             {badgeLabel}
           </Text>
         </View>
-        <LottieView
-          source={animations[variant]}
-          autoPlay
-          loop={variant !== "success"}
-          style={[
-            styles.lottie,
-            {
-              width: size,
-              height: size,
-            },
-          ]}
-        />
+        {LottieView ? (
+          <LottieView
+            source={animations[variant]}
+            autoPlay
+            loop={variant !== "success"}
+            style={[
+              styles.lottie,
+              {
+                width: size,
+                height: size,
+              },
+            ]}
+          />
+        ) : (
+          <View
+            style={[
+              styles.lottieFallback,
+              {
+                width: size,
+                height: size,
+                backgroundColor: `${colors.badgeBg}AA`,
+                borderColor: `${colors.accent}22`,
+              },
+            ]}
+          >
+            <View style={[styles.fallbackOrb, { backgroundColor: colors.accent }]} />
+            <Text style={[styles.fallbackLabel, { color: colors.badgeText }]}>
+              {variant === "success" ? "Ready" : "Loading"}
+            </Text>
+          </View>
+        )}
       </View>
       {showText ? (
         <>
@@ -197,6 +225,26 @@ const styles = StyleSheet.create({
   },
   lottie: {
     alignSelf: "center",
+  },
+  lottieFallback: {
+    alignSelf: "center",
+    borderRadius: 28,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  fallbackOrb: {
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    opacity: 0.9,
+  },
+  fallbackLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   emptyFrameFlat: {
     width: "100%",
