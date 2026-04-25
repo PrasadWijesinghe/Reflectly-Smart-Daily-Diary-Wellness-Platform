@@ -403,13 +403,15 @@ Return only valid JSON with this exact schema:
       "title": "2-4 words",
       "subtitle": "1 sentence, grounded in the data",
       "icon": "one of: sparkles-outline, pulse-outline, leaf-outline, calendar-outline, moon-outline, sunny-outline, checkmark-done-outline, alert-circle-outline, flame-outline, walk-outline, chatbubble-ellipses-outline, book-outline, bulb-outline, heart-outline, ribbon-outline",
-      "color": "one of: #10B981, #3B82F6, #F59E0B, #EF4444, #8B5CF6, #14B8A6"
+      "color": "one of: #10B981, #3B82F6, #F59E0B, #EF4444, #8B5CF6, #14B8A6",
+      "focusKeyword": "1 specific keyword representing this card's topic (e.g., work, stress, mood, sleep)"
     },
     {
       "title": "2-4 words",
       "subtitle": "1 sentence, grounded in the data",
       "icon": "one of the allowed icons",
-      "color": "one of the allowed colors"
+      "color": "one of the allowed colors",
+      "focusKeyword": "1 specific keyword representing this card's topic"
     }
   ],
   "tips": [
