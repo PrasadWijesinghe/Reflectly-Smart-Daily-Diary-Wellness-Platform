@@ -98,8 +98,10 @@ export default function DiaryEditor({ entry, date, tags, token, onSave, onCancel
         try {
           const formData = new FormData();
           pendingUris.forEach((uri, i) => {
-            const ext = uri.split(".").pop() || "jpg";
-            formData.append("images", { uri, name: `photo_${i}.${ext}`, type: `image/${ext}` } as any);
+            const ext = (uri.split(".").pop() || "jpg").toLowerCase();
+            const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", heic: "image/heic", heif: "image/heif" };
+            const type = mimeMap[ext] ?? "image/jpeg";
+            formData.append("images", { uri, name: `photo_${i}.${ext}`, type } as any);
           });
           const imgRes = await fetch(`${getApiUrl()}/diary/${entryId}/images`, {
             method: "POST",
