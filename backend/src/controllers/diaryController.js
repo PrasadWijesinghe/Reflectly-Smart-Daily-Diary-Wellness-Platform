@@ -1,19 +1,13 @@
 const prisma = require("../utils/prisma");
+
 const {
   incrementDiaryEntriesCreated,
   incrementDiaryEntriesUpdated,
   incrementDiaryEntriesDeleted,
 } = require("../utils/metrics");
-const {
-  generateAISummary,
-  analyzeMoodScore,
-  analyzeEmotionalCloud,
-  generateAIInsightsPanel,
-  getCachedInsightsPanel,
-  setCachedInsightsPanel,
-  invalidateInsightsPanelCache,
-} = require("../utils/gemini");
+const { generateAISummary } = require("../utils/gemini");
 const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
+
 
 function generateSummary(content) {
   const trimmed = content.trim();
@@ -514,8 +508,12 @@ async function getEntries(req, res) {
           userId: req.user.userId,
           date: { gte: d, lt: nextDay },
         },
-        include: { tags: true },
+        include: { tags: true, images: { orderBy: { order: 'asc' } } },
       });
+
+      if (entry) {
+        entry.images = entry.images.map((img) => ({ ...img, url: `/uploads/${img.filename}` }));
+      }
 
       return res.json({ entry: entry || null });
     }
@@ -523,10 +521,15 @@ async function getEntries(req, res) {
     const entries = await prisma.dailyDiary.findMany({
       where: { userId: req.user.userId },
       orderBy: { date: "desc" },
-      include: { tags: true },
+      include: { tags: true, images: { orderBy: { order: 'asc' } } },
     });
 
-    res.json({ entries });
+    const mappedEntries = entries.map((e) => ({
+      ...e,
+      images: e.images.map((img) => ({ ...img, url: `/uploads/${img.filename}` })),
+    }));
+
+    res.json({ entries: mappedEntries });
   } catch (err) {
     console.error("GetEntries error:", err);
     res.status(500).json({ error: "Internal server error." });
@@ -581,8 +584,9 @@ async function createEntry(req, res) {
     });
 
     incrementDiaryEntriesCreated();
-    invalidateInsightsPanelCache(`insights:${req.user.userId}:`);
     await regenerateWeekSummary(req.user.userId, normalizedDate);
+
+
     res.status(201).json({ message: "Entry saved.", entry });
   } catch (err) {
     if (err.code === "P2002") {
@@ -599,12 +603,14 @@ async function getEntry(req, res) {
   try {
     const entry = await prisma.dailyDiary.findFirst({
       where: { id: parseInt(req.params.id, 10), userId: req.user.userId },
-      include: { tags: true },
+      include: { tags: true, images: { orderBy: { order: 'asc' } } },
     });
 
     if (!entry) {
       return res.status(404).json({ error: "Entry not found." });
     }
+
+    entry.images = entry.images.map((img) => ({ ...img, url: `/uploads/${img.filename}` }));
 
     res.json({ entry });
   } catch (err) {
@@ -649,8 +655,9 @@ async function updateEntry(req, res) {
     });
 
     incrementDiaryEntriesUpdated();
-    invalidateInsightsPanelCache(`insights:${req.user.userId}:`);
     await regenerateWeekSummary(req.user.userId, existing.date);
+
+
     res.json({ message: "Entry updated.", entry });
   } catch (err) {
     console.error("UpdateEntry error:", err);
@@ -760,8 +767,9 @@ async function deleteEntry(req, res) {
     await prisma.dailyDiary.delete({ where: { id: existing.id } });
 
     incrementDiaryEntriesDeleted();
-    invalidateInsightsPanelCache(`insights:${req.user.userId}:`);
     await regenerateWeekSummary(req.user.userId, existing.date);
+
+
     res.json({ message: "Entry deleted." });
   } catch (err) {
     console.error("DeleteEntry error:", err);

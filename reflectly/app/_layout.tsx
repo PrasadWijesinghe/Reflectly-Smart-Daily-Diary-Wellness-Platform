@@ -49,28 +49,23 @@ function GlobalMiniPlayer() {
   );
 }
 
-function LayoutContent() {
-  return (
-    <>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="viewall-diary" />
-        <Stack.Screen name="music" />
-      </Stack>
-      <GlobalMiniPlayer />
-      <AppLockGate />
-    </>
-  );
-}
-
 export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
         <MusicProvider>
-          <LayoutContent />
+          <>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="viewall-diary" />
+            <Stack.Screen name="music" />
+            </Stack>
+            <GlobalMiniPlayer />
+            <AppLockGate />
+          </>
+
         </MusicProvider>
       </AuthProvider>
     </ThemeProvider>

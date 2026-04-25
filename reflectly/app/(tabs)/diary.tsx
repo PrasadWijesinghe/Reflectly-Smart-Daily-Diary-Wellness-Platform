@@ -25,12 +25,23 @@ type Tag = {
   color: string;
 };
 
+type DiaryImage = {
+  id: number;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  order: number;
+  url: string;
+};
+
 type DiaryEntry = {
   id: number;
   date: string;
   content: string;
   summary: string;
   tags: Tag[];
+  images: DiaryImage[];
   createdAt: string;
   updatedAt: string;
 };
