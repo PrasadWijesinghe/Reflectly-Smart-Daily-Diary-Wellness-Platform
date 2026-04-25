@@ -5,7 +5,9 @@ import { Sidebar } from "./components/Sidebar";
 import { Header } from "./components/Header";
 import { Dashboard } from "./components/Dashboard";
 import { UsersList } from "./components/UsersList";
+import { TagsList } from "./components/TagsList";
 import { FeedbackList } from "./components/FeedbackList";
+import { SystemHealth } from "./components/SystemHealth";
 
 const STORAGE_KEY = "reflectly_admin_token";
 
@@ -17,6 +19,7 @@ export default function App() {
   
   // Data State
   const [users, setUsers] = useState([]);
+  const [tags, setTags] = useState([]);
   const [feedbacks, setFeedbacks] = useState([]);
   const [summary, setSummary] = useState({
     totalUsers: 0,
@@ -28,6 +31,7 @@ export default function App() {
   const [dashboardError, setDashboardError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [isLoadingTags, setIsLoadingTags] = useState(false);
   const [isLoadingFeedbacks, setIsLoadingFeedbacks] = useState(false);
   
   // Navigation State
@@ -106,9 +110,66 @@ export default function App() {
     }
   }
 
+  async function loadTags(activeToken = token) {
+    if (!activeToken) return;
+
+    setIsLoadingTags(true);
+    setDashboardError("");
+
+    try {
+      const response = await fetch(`${getApiUrl()}/admin/tags`, {
+        headers: {
+          Authorization: `Bearer ${activeToken}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to load tags.");
+      }
+
+      setTags(Array.isArray(data.tags) ? data.tags : []);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load tags.";
+      setDashboardError(message);
+
+      if (/token|admin access|required|expired|invalid/i.test(message)) {
+        handleLogout();
+      }
+    } finally {
+      setIsLoadingTags(false);
+    }
+  }
+
+  async function handleCreateTag(tag) {
+    if (!token) return;
+
+    setDashboardError("");
+
+    const response = await fetch(`${getApiUrl()}/admin/tags`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(tag),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to create tag.");
+    }
+
+    await loadTags(token);
+    return data.tag;
+  }
+
   useEffect(() => {
     if (token) {
       loadUsers(token);
+      loadTags(token);
       loadFeedbacks(token);
     }
   }, [token]);
@@ -116,6 +177,10 @@ export default function App() {
   function handleRefresh() {
     if (activeTab === 'users' || activeTab === 'dashboard') {
       loadUsers(token);
+    }
+
+    if (activeTab === 'tags') {
+      loadTags(token);
     }
 
     if (activeTab === 'feedback') {
@@ -127,6 +192,7 @@ export default function App() {
     localStorage.removeItem(STORAGE_KEY);
     setToken("");
     setUsers([]);
+    setTags([]);
     setFeedbacks([]);
     setSummary({
       totalUsers: 0,
@@ -201,6 +267,16 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'tags' && (
+            <TagsList
+              tags={tags}
+              loading={isLoadingTags}
+              error={dashboardError}
+              onRefresh={handleRefresh}
+              onCreateTag={handleCreateTag}
+            />
+          )}
+
           {activeTab === 'feedback' && (
             <FeedbackList 
               feedbacks={feedbacks} 
@@ -209,6 +285,8 @@ export default function App() {
               onRefresh={handleRefresh} 
             />
           )}
+
+          {activeTab === 'health' && <SystemHealth />}
         </main>
       </div>
     </div>
