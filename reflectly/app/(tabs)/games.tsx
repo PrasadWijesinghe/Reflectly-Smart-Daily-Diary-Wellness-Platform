@@ -11,7 +11,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 
-type GameRoute = "/games/calm-breathing" | "/games/memory-match" | "/games/game-2048";
+type GameRoute = 
+  | "/games/calm-breathing" 
+  | "/games/memory-match" 
+  | "/games/game-2048"
+  | "/games/bubble-pop"
+  | "/games/color-tap"
+  | "/games/tap-rhythm"
+  | "/games/math-sprint"
+  | "/games/quick-tap";
 
 type Game = {
   id: number;
@@ -62,6 +70,66 @@ const GAMES: Game[] = [
     difficulty: "Puzzle",
     duration: "5 min",
     accent: "#0F172A",
+  },
+  {
+    id: 4,
+    title: "Bubble Pop",
+    subtitle: "Pop bubbles to relax - satisfying pressure release.",
+    icon: "radio-button-on-outline",
+    route: "/games/bubble-pop",
+    iconBg: "#EC4899",
+    cardBg: "#FDF2F8",
+    difficulty: "Gentle",
+    duration: "2 min",
+    accent: "#DB2777",
+  },
+  {
+    id: 5,
+    title: "Color Tap",
+    subtitle: "Tap matching colors quickly to train focus.",
+    icon: "color-palette-outline",
+    route: "/games/color-tap",
+    iconBg: "#F59E0B",
+    cardBg: "#FFFBEB",
+    difficulty: "Light Focus",
+    duration: "3 min",
+    accent: "#D97706",
+  },
+  {
+    id: 6,
+    title: "Tap Rhythm",
+    subtitle: "Follow the beat - simple rhythm game to calm your mind.",
+    icon: "musical-notes-outline",
+    route: "/games/tap-rhythm",
+    iconBg: "#14B8A6",
+    cardBg: "#F0FDFA",
+    difficulty: "Gentle",
+    duration: "3 min",
+    accent: "#0D9488",
+  },
+  {
+    id: 7,
+    title: "Math Sprint",
+    subtitle: "Quick math problems to sharpen focus.",
+    icon: "calculator-outline",
+    route: "/games/math-sprint",
+    iconBg: "#6366F1",
+    cardBg: "#EEF2FF",
+    difficulty: "Light Focus",
+    duration: "2 min",
+    accent: "#4F46E5",
+  },
+  {
+    id: 8,
+    title: "Quick Tap",
+    subtitle: "Test your reflexes - tap targets fast!",
+    icon: "flash-outline",
+    route: "/games/quick-tap",
+    iconBg: "#EF4444",
+    cardBg: "#FEF2F2",
+    difficulty: "Quick",
+    duration: "1 min",
+    accent: "#DC2626",
   },
 ];
 

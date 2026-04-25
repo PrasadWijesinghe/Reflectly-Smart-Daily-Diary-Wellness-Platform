@@ -38,11 +38,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const storedUser = await AsyncStorage.getItem("user");
 
       if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        const res = await fetchWithTimeout(`${getApiUrl()}/auth/me`, {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+
+        if (res.ok) {
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+        } else {
+          await AsyncStorage.removeItem("token");
+          await AsyncStorage.removeItem("user");
+        }
       }
     } catch (err) {
       console.error("Failed to load stored auth:", err);
+      await AsyncStorage.removeItem("token");
+      await AsyncStorage.removeItem("user");
     } finally {
       setIsLoading(false);
     }

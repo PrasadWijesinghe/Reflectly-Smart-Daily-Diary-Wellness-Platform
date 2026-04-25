@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -26,6 +25,7 @@ export default function CalmBreathingScreen() {
   const scale = useRef(new Animated.Value(0.9)).current;
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [cycleCount, setCycleCount] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(Math.ceil(PHASES[0].durationMs / 1000));
@@ -93,21 +93,23 @@ export default function CalmBreathingScreen() {
     setIsRunning((prev) => !prev);
   }
 
-  function handleReset() {
+function handleReset() {
     stopTimers();
-    scale.stopAnimation();
-    scale.setValue(0.9);
     setIsRunning(false);
     setPhaseIndex(0);
     setCycleCount(0);
     setSecondsLeft(Math.ceil(PHASES[0].durationMs / 1000));
+    scale.setValue(0.9);
   }
 
-  const encouragement = useMemo(() => {
-    if (cycleCount >= 4) return "Your breathing is steady now. Let your shoulders drop.";
-    if (cycleCount >= 2) return "Nice rhythm. Stay with the breath and keep it gentle.";
-    return "Start slow. One calm breath at a time is enough.";
-  }, [cycleCount]);
+  function startGame() {
+    setGameStarted(true);
+    setIsRunning(true);
+    setPhaseIndex(0);
+    setCycleCount(0);
+    setSecondsLeft(Math.ceil(PHASES[0].durationMs / 1000));
+    scale.setValue(0.9);
+  }
 
   function handleBack() {
     if (router.canGoBack()) {
@@ -131,12 +133,22 @@ export default function CalmBreathingScreen() {
         </View>
       </LinearGradient>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.heroCard}>
+      {!gameStarted ? (
+        <View style={styles.content}>
+          <View style={styles.startScreen}>
+            <Text style={styles.startTitle}>Calm Breathing</Text>
+            <Text style={styles.startSubtitle}>A quick reset between study sessions</Text>
+            <View style={styles.startInfo}>
+              <Text style={styles.infoText}>Inhale as the circle grows, hold gently, then exhale as it shrinks.</Text>
+            </View>
+            <TouchableOpacity style={styles.startBtn} onPress={startGame} activeOpacity={0.85}>
+              <Text style={styles.startBtnText}>Start</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.content}>
+          <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Current phase</Text>
           <Text style={styles.phaseText}>{currentPhase.label}</Text>
           <Text style={styles.timerText}>{secondsLeft}s</Text>
@@ -182,7 +194,8 @@ export default function CalmBreathingScreen() {
           <Text style={styles.instructionsText}>Inhale as the circle grows, hold gently, then exhale as it shrinks.</Text>
           <Text style={styles.instructionsText}>Try 3 to 5 cycles before going back to your work.</Text>
         </View>
-      </ScrollView>
+      </View>
+      )}
     </View>
   );
 }
@@ -194,8 +207,7 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   headerTitle: { fontSize: 24, fontWeight: "700", color: "#FFFFFF" },
   headerSubtitle: { fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 4 },
-  scrollView: { flex: 1 },
-  content: { padding: 20, paddingBottom: 36 },
+  content: { flex: 1, padding: 20 },
   heroCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 22, alignItems: "center", shadowColor: "#6D28D9", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4 },
   heroLabel: { fontSize: 12, fontWeight: "700", color: "#8B5CF6", textTransform: "uppercase", letterSpacing: 1 },
   phaseText: { fontSize: 30, fontWeight: "700", color: "#312E81", marginTop: 8 },
@@ -216,4 +228,11 @@ const styles = StyleSheet.create({
   instructionsCard: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 18, marginTop: 18 },
   instructionsTitle: { fontSize: 16, fontWeight: "700", color: "#312E81", marginBottom: 10 },
   instructionsText: { fontSize: 14, lineHeight: 22, color: "#5B587A", marginBottom: 6 },
+  startScreen: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 20 },
+  startTitle: { fontSize: 32, fontWeight: "800", color: "#312E81", marginBottom: 8 },
+  startSubtitle: { fontSize: 16, color: "#6D28D9", marginBottom: 24 },
+  startInfo: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 18, marginBottom: 24, width: "100%" },
+  infoText: { fontSize: 15, lineHeight: 24, color: "#5B587A", textAlign: "center" },
+  startBtn: { backgroundColor: "#7C3AED", paddingHorizontal: 48, paddingVertical: 16, borderRadius: 16 },
+  startBtnText: { fontSize: 17, fontWeight: "700", color: "#FFFFFF" },
 });

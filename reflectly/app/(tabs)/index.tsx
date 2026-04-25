@@ -23,7 +23,7 @@ const SUGGESTIONS = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user, token, isLoading: isAuthLoading } = useAuth();
   const firstName = user?.name?.split(" ")[0] || "there";
   const [weekMoods, setWeekMoods] = useState<MoodTrendDay[]>([]);
   const [isLoadingWeekMoods, setIsLoadingWeekMoods] = useState(true);
@@ -37,7 +37,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     async function loadWeekMoods() {
-      if (!token) {
+      if (isAuthLoading || !token) {
         setWeekMoods([]);
         setIsLoadingWeekMoods(false);
         return;
