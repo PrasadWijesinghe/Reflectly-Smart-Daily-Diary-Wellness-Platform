@@ -334,18 +334,18 @@ export default function HomeScreen() {
               <View className="bg-white/20 rounded-full p-2">
                 <Ionicons name="arrow-forward" size={20} color="white" />
               </View>
-            </View>
+</View>
           </TouchableOpacity>
 
-          <TouchableOpacity activeOpacity={0.85} className="mb-4" onPress={() => router.push("/music")}>
-            <View style={{ backgroundColor: "#8B5CF6", borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <TouchableOpacity activeOpacity={0.85} className="mb-4" onPress={() => router.push("/videos")}>
+            <View style={{ backgroundColor: "#B91C1C", borderRadius: 16, paddingHorizontal: 20, paddingVertical: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <View className="flex-row items-center flex-1">
                 <View className="bg-white/20 rounded-full p-2 mr-3">
-                  <Ionicons name="musical-notes" size={22} color="white" />
+                  <Ionicons name="logo-youtube" size={22} color="white" />
                 </View>
                 <View>
-                  <Text className="text-white font-bold text-base">Hear Some Music</Text>
-                  <Text className="text-white/80 text-xs mt-0.5">Relax with calming tunes 🎵</Text>
+                  <Text className="text-white font-bold text-base">Watch Videos</Text>
+                  <Text className="text-white/80 text-xs mt-0.5">ASMR, Cars, Music & more 🎬</Text>
                 </View>
               </View>
               <View className="bg-white/20 rounded-full p-2">

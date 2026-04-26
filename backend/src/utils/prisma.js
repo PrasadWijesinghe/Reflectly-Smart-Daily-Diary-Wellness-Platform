@@ -3,6 +3,11 @@ const { PrismaPg } = require("@prisma/adapter-pg");
 const { Pool } = require("pg");
 
 const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error(
+    "DATABASE_URL is missing. Add it to backend/.env before starting the server."
+  );
+}
 
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
