@@ -1,8 +1,9 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import { BACKEND_API_URL } from "../../shared/backendUrl.js";
 
 const API_PORT = "5000";
-const DEFAULT_API_URL = `http://localhost:${API_PORT}/api`;
+const DEFAULT_API_URL = BACKEND_API_URL;
 
 function normalizeApiUrl(url: string): string {
   const cleaned = url.replace(/\/+$/, "");
@@ -29,15 +30,13 @@ function isExpoTunnelHost(host: string): boolean {
 }
 
 export const getApiUrl = (): string => {
-  // Web browsers run on the same machine as the backend.
-  // Always use localhost on web — never the LAN IP from the env var.
-  if (Platform.OS === "web") {
-    return DEFAULT_API_URL;
-  }
-
   const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envApiUrl) {
     return normalizeApiUrl(envApiUrl);
+  }
+
+  if (Platform.OS === "web") {
+    return DEFAULT_API_URL;
   }
 
   const host = getExpoHost();
@@ -62,7 +61,7 @@ export const getApiUrl = (): string => {
 };
 
 export function getImageUrl(imagePath: string): string {
-  return getApiUrl().replace('/api', '') + imagePath;
+  return getApiUrl().replace("/api", "") + imagePath;
 }
 
 export async function fetchWithTimeout(

@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const prisma = require("../utils/prisma");
 const transporter = require("../utils/mailer");
+const { incrementAuthEvent } = require("../utils/metrics");
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -135,9 +136,11 @@ const sendRegistrationOtp = async (req, res) => {
       lastSentAt: Date.now(),
     });
 
+    incrementAuthEvent("send_otp", "success");
     return res.json({ message: "OTP sent successfully.", expiresInSeconds: OTP_TTL_MS / 1000 });
   } catch (err) {
     console.error("SendRegistrationOtp error:", err);
+    incrementAuthEvent("send_otp", "failure");
     return res.status(500).json({ error: "Failed to send OTP. Please try again." });
   }
 };
@@ -198,9 +201,11 @@ const sendForgotPasswordOtp = async (req, res) => {
       lastSentAt: Date.now(),
     });
 
+    incrementAuthEvent("forgot_password_send_otp", "success");
     return res.json({ message: "OTP sent successfully.", expiresInSeconds: OTP_TTL_MS / 1000 });
   } catch (err) {
     console.error("SendForgotPasswordOtp error:", err);
+    incrementAuthEvent("forgot_password_send_otp", "failure");
     return res.status(500).json({ error: "Failed to send OTP. Please try again." });
   }
 };
@@ -227,9 +232,11 @@ const verifyForgotPasswordOtp = async (req, res) => {
       return res.status(400).json({ error: "Invalid or expired OTP." });
     }
 
+    incrementAuthEvent("forgot_password_verify_otp", "success");
     return res.json({ message: "OTP verified." });
   } catch (err) {
     console.error("VerifyForgotPasswordOtp error:", err);
+    incrementAuthEvent("forgot_password_verify_otp", "failure");
     return res.status(500).json({ error: "Failed to verify OTP." });
   }
 };
@@ -277,9 +284,11 @@ const resetPasswordWithOtp = async (req, res) => {
 
     forgotPasswordOtpStore.delete(normalizedEmail);
 
+    incrementAuthEvent("forgot_password_reset", "success");
     return res.json({ message: "Password reset successful." });
   } catch (err) {
     console.error("ResetPasswordWithOtp error:", err);
+    incrementAuthEvent("forgot_password_reset", "failure");
     return res.status(500).json({ error: "Failed to reset password." });
   }
 };
@@ -325,6 +334,7 @@ const register = async (req, res) => {
     });
 
     otpStore.delete(normalizedEmail);
+    incrementAuthEvent("register", "success");
 
     const token = jwt.sign(
       { userId: user.id, email: user.email },
@@ -339,6 +349,7 @@ const register = async (req, res) => {
     });
   } catch (err) {
     console.error("Register error:", err);
+    incrementAuthEvent("register", "failure");
     res.status(500).json({ error: "Internal server error." });
   }
 };
@@ -374,6 +385,7 @@ const login = async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
+    incrementAuthEvent("login", "success");
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       process.env.JWT_SECRET,
@@ -387,6 +399,7 @@ const login = async (req, res) => {
     });
   } catch (err) {
     console.error("Login error:", err);
+    incrementAuthEvent("login", "failure");
     res.status(500).json({ error: "Internal server error." });
   }
 };
@@ -410,9 +423,11 @@ const getMe = async (req, res) => {
       return res.status(404).json({ error: "User not found." });
     }
 
+    incrementAuthEvent("me", "success");
     res.json({ user });
   } catch (err) {
     console.error("GetMe error:", err);
+    incrementAuthEvent("me", "failure");
     res.status(500).json({ error: "Internal server error." });
   }
 };
@@ -437,12 +452,14 @@ const setupAppLock = async (req, res) => {
       },
     });
 
+    incrementAuthEvent("app_lock_setup", "success");
     return res.json({
       message: "App lock updated.",
       user: serializeUser(user),
     });
   } catch (err) {
     console.error("SetupAppLock error:", err);
+    incrementAuthEvent("app_lock_setup", "failure");
     return res.status(500).json({ error: "Failed to update app lock." });
   }
 };
@@ -458,12 +475,14 @@ const disableAppLock = async (req, res) => {
       },
     });
 
+    incrementAuthEvent("app_lock_disable", "success");
     return res.json({
       message: "App lock disabled.",
       user: serializeUser(user),
     });
   } catch (err) {
     console.error("DisableAppLock error:", err);
+    incrementAuthEvent("app_lock_disable", "failure");
     return res.status(500).json({ error: "Failed to disable app lock." });
   }
 };
@@ -499,12 +518,14 @@ const verifyAppLock = async (req, res) => {
       return res.status(401).json({ error: "Incorrect app lock value." });
     }
 
+    incrementAuthEvent("app_lock_verify", "success");
     return res.json({
       message: "App lock verified.",
       appLockType: user.appLockType || null,
     });
   } catch (err) {
     console.error("VerifyAppLock error:", err);
+    incrementAuthEvent("app_lock_verify", "failure");
     return res.status(500).json({ error: "Failed to verify app lock." });
   }
 };

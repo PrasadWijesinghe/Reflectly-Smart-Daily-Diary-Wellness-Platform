@@ -11,6 +11,7 @@ const {
   generateAIInsightsPanel,
   getCachedInsightsPanel,
   setCachedInsightsPanel,
+  invalidateInsightsPanelCache,
 } = require("../utils/gemini");
 const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
 
@@ -459,7 +460,7 @@ async function updateEntry(req, res) {
       console.log(`[AI Summary] Generating summary for entry ${existing.id}, user ${req.user.userId}`);
       updateData.summary = await generateAISummary(content);
       console.log(`[AI Summary] Generated: "${updateData.summary}"`);
-      
+
       console.log(`[AI Mood] Analyzing mood for entry ${existing.id}`);
       updateData.moodScore = await analyzeMoodScore(content);
       console.log(`[AI Mood] Result: ${updateData.moodScore}`);
@@ -571,6 +572,26 @@ async function getEmotionalCloud(req, res) {
     });
   } catch (err) {
     console.error("GetEmotionalCloud error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+}
+
+async function getAiInsights(req, res) {
+  try {
+    const requestedDays = Number.parseInt(req.query.days, 10);
+    const days = Number.isFinite(requestedDays) && requestedDays > 0 ? requestedDays : 7;
+    const cacheKey = `user:${req.user.userId}:days:${days}`;
+
+    const cached = getCachedInsightsPanel(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const panel = await generateAIInsightsPanel(req.user.userId, days);
+    setCachedInsightsPanel(cacheKey, panel);
+    res.json(panel);
+  } catch (err) {
+    console.error("GetAiInsights error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 }
