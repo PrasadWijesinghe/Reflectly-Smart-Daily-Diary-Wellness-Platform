@@ -4,7 +4,14 @@ const {
   incrementDiaryEntriesUpdated,
   incrementDiaryEntriesDeleted,
 } = require("../utils/metrics");
-const { generateAISummary } = require("../utils/gemini");
+const {
+  generateAISummary,
+  analyzeMoodScore,
+  analyzeEmotionalCloud,
+  generateAIInsightsPanel,
+  getCachedInsightsPanel,
+  setCachedInsightsPanel,
+} = require("../utils/gemini");
 const { invalidateWeekCache, regenerateWeekSummary } = require("./weeklyController");
 
 
@@ -586,6 +593,107 @@ async function deleteEntry(req, res) {
     res.json({ message: "Entry deleted." });
   } catch (err) {
     console.error("DeleteEntry error:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+}
+
+async function getAiInsights(req, res) {
+  try {
+    const days = parseInt(req.query.days, 10) || 7;
+    const userId = req.user.userId;
+    const cacheKey = `ai-insights-${userId}-${days}`;
+
+    const cached = getCachedInsightsPanel(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const start = new Date(today);
+    start.setUTCDate(start.getUTCDate() - days + 1);
+
+    const entries = await prisma.dailyDiary.findMany({
+      where: {
+        userId,
+        date: {
+          gte: start,
+        },
+      },
+      include: { tags: true },
+      orderBy: { date: "asc" },
+    });
+
+    const entryCount = entries.length;
+    let averageMood = 0;
+    let averageStress = 0;
+    let positiveDays = 0;
+    let negativeDays = 0;
+    let bestDay = null;
+    let worstDay = null;
+    let maxStress = -1;
+    const topicCounts = {};
+
+    if (entryCount > 0) {
+      let totalMood = 0;
+      let totalStress = 0;
+
+      entries.forEach((entry) => {
+        totalMood += entry.moodScore || 50;
+        const stress = getStressScore(entry);
+        totalStress += stress;
+
+        if (entry.moodScore >= 65) positiveDays++;
+        else if (entry.moodScore <= 35) negativeDays++;
+
+        if (!bestDay || entry.moodScore > bestDay.moodScore) {
+          bestDay = {
+            dayLabel: entry.date.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }),
+            moodScore: entry.moodScore,
+          };
+        }
+
+        if (stress > maxStress) {
+          maxStress = stress;
+          worstDay = {
+            dayLabel: entry.date.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }),
+            moodScore: entry.moodScore,
+          };
+        }
+
+        entry.tags.forEach((tag) => {
+          topicCounts[tag.name] = (topicCounts[tag.name] || 0) + 1;
+        });
+      });
+
+      averageMood = Math.round(totalMood / entryCount);
+      averageStress = Math.round(totalStress / entryCount);
+    }
+
+    const topTopics = Object.entries(topicCounts)
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+
+    const context = {
+      periodLabel: days === 7 ? "last 7 days" : "last 30 days",
+      entryCount,
+      averageMood,
+      averageStress,
+      topTopics,
+      bestDay,
+      worstDay,
+      positiveDays,
+      negativeDays,
+    };
+
+    const panel = await generateAIInsightsPanel(context);
+    setCachedInsightsPanel(cacheKey, panel);
+
+    res.json(panel);
+  } catch (err) {
+    console.error("GetAiInsights error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 }
