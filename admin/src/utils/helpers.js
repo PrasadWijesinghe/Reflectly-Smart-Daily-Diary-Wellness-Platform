@@ -1,5 +1,7 @@
-const DEFAULT_API_URL = "http://localhost:5000/api";
-const DEFAULT_GRAFANA_URL = "http://localhost:3000";
+import { BACKEND_API_URL, BACKEND_GRAFANA_URL } from "../../../shared/backendUrl.js";
+
+const DEFAULT_API_URL = BACKEND_API_URL;
+const DEFAULT_GRAFANA_URL = BACKEND_GRAFANA_URL;
 
 export function getApiUrl() {
   const envUrl = import.meta.env.VITE_API_URL;

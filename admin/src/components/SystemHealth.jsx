@@ -6,6 +6,12 @@ function getMetricsUrl() {
   return apiUrl.endsWith("/api") ? `${apiUrl.slice(0, -4)}/metrics` : `${apiUrl}/metrics`;
 }
 
+function getPrometheusTarget() {
+  const apiUrl = getApiUrl().replace(/\/+$/, "");
+  const withoutApi = apiUrl.endsWith("/api") ? apiUrl.slice(0, -4) : apiUrl;
+  return withoutApi.replace(/^https?:\/\//, "");
+}
+
 const METRICS = [
   {
     label: "HTTP traffic",
@@ -40,10 +46,10 @@ const CHECKLIST = [
   "Keep the admin site limited to aggregate data only",
 ];
 
-const SCRAPE_EXAMPLE = `scrape_configs:
+const SCRAPE_EXAMPLE = (target) => `scrape_configs:
   - job_name: "reflectly-backend"
     static_configs:
-      - targets: ["localhost:5000"]`;
+      - targets: ["${target}"]`;
 
 function toneClasses(tone) {
   if (tone === "emerald") return "bg-emerald-50 text-emerald-700 border-emerald-200";
@@ -54,6 +60,7 @@ function toneClasses(tone) {
 export function SystemHealth() {
   const metricsUrl = getMetricsUrl();
   const grafanaUrl = getGrafanaDashboardUrl();
+  const scrapeTarget = getPrometheusTarget();
 
   return (
     <div className="rounded-sm border border-slate-200 bg-white shadow-sm pt-6 pb-2.5 sm:px-7.5 xl:pb-1 relative">
@@ -105,7 +112,7 @@ export function SystemHealth() {
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5">
           <p className="text-sm font-semibold text-slate-800">Suggested Prometheus config</p>
           <pre className="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-xs leading-6 text-slate-100">
-            {SCRAPE_EXAMPLE}
+            {SCRAPE_EXAMPLE(scrapeTarget)}
           </pre>
         </div>
 
