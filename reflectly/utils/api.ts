@@ -71,12 +71,15 @@ export async function fetchWithTimeout(
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const requestUrl = typeof input === "string" ? input : input instanceof URL ? input.toString() : "";
 
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } catch (err: any) {
     if (err?.name === "AbortError") {
-      throw new Error("Request timed out. Check backend connection and try again.");
+      throw new Error(
+        `Request timed out while contacting ${requestUrl || "the backend"}. Check the AWS backend URL and network access.`,
+      );
     }
     throw err;
   } finally {
