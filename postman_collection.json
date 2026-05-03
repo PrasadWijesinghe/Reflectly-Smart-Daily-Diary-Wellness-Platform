@@ -1,0 +1,1109 @@
+{
+  "info": {
+    "name": "Reflectly API",
+    "description": "Postman collection for the Reflectly Smart Daily Diary & Wellness Platform backend API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "diaryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tagId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "imageId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": []
+            },
+            "description": "Health check endpoint. Returns a message confirming the API is running."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["metrics"]
+            },
+            "description": "Prometheus metrics scrape endpoint. Returns HTTP and app metrics in Prometheus format."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /api/auth/register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.token) {",
+                  "    pm.collectionVariables.set('accessToken', res.token);",
+                  "}",
+                  "if (res.user && res.user.id) {",
+                  "    pm.collectionVariables.set('userId', res.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Samantha Wells\",\n    \"email\": \"samantha.wells@example.com\",\n    \"password\": \"SecurePass123!\",\n    \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register a new user. Requires name, email, password (min 8 chars, uppercase, lowercase, symbol), and a valid 6-digit OTP sent via /api/auth/send-otp. Returns token and user object."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/send-otp",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"samantha.wells@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/send-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "send-otp"]
+            },
+            "description": "Send a 6-digit OTP to the provided email address for registration verification. OTP expires in 10 minutes. Requires SMTP to be configured on the backend."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.token) {",
+                  "    pm.collectionVariables.set('accessToken', res.token);",
+                  "}",
+                  "if (res.user && res.user.id) {",
+                  "    pm.collectionVariables.set('userId', res.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"samantha.wells@example.com\",\n    \"password\": \"SecurePass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Authenticate an existing user. Returns a JWT token and user object. Token expires in 7 days."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/auth/me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Get the currently authenticated user's profile. Requires a valid JWT token."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/forgot-password/send-otp",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"samantha.wells@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password/send-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "forgot-password", "send-otp"]
+            },
+            "description": "Send a 6-digit OTP to the provided email for password reset. Returns a success message even if the email does not exist (prevents email enumeration)."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/forgot-password/verify-otp",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"samantha.wells@example.com\",\n    \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "forgot-password", "verify-otp"]
+            },
+            "description": "Verify a 6-digit OTP sent for password reset. Returns success if the OTP is valid and not expired."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/forgot-password/reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"samantha.wells@example.com\",\n    \"otp\": \"123456\",\n    \"newPassword\": \"NewSecurePass123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password/reset",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "forgot-password", "reset"]
+            },
+            "description": "Reset the user's password using a valid OTP. Requires email, 6-digit OTP, and a new password (min 8 chars with uppercase, lowercase, and symbol)."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/app-lock/setup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type\": \"pin\",\n    \"secret\": \"1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/app-lock/setup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "app-lock", "setup"]
+            },
+            "description": "Set up app lock for the authenticated user. The lock type can be 'pin' (exactly 4 digits) or 'password' (min 6 characters). The secret is hashed and stored."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/auth/app-lock/verify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"secret\": \"1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/app-lock/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "app-lock", "verify"]
+            },
+            "description": "Verify the user's app lock secret. Returns success if the secret matches the stored hash."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/auth/app-lock",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/app-lock",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "app-lock"]
+            },
+            "description": "Disable the app lock for the authenticated user. Removes the appLockEnabled flag, appLockType, and appLockHash."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Diary",
+      "item": [
+        {
+          "name": "POST /api/diary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.entry && res.entry.id) {",
+                  "    pm.collectionVariables.set('diaryId', res.entry.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"content\": \"Today was a productive day. I managed to complete all my tasks and even had time for a short walk in the evening. Feeling grateful for the small wins.\",\n    \"date\": \"2026-04-26\",\n    \"tagIds\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/diary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary"]
+            },
+            "description": "Create a new diary entry for the authenticated user. The AI generates a summary automatically. If an entry already exists for the date, returns a 409 conflict. The date field accepts ISO 8601 format (defaults to today if omitted)."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/diary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary"]
+            },
+            "description": "Get all diary entries for the authenticated user, ordered by date descending. Optionally filter by date using the query parameter. Includes associated tags and images."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/diary (by date)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary?date=2026-04-26",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary"],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-04-26",
+                  "description": "Filter entries by date (YYYY-MM-DD)"
+                }
+              ]
+            },
+            "description": "Get a diary entry for a specific date. Returns null if no entry exists for that date. Includes tags and images."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/diary/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/{{diaryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "{{diaryId}}"]
+            },
+            "description": "Get a specific diary entry by ID. Only returns entries belonging to the authenticated user. Includes tags and images."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/diary/:id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"content\": \"Updated entry: Today was even better than I thought. I finished the project ahead of schedule and treated myself to a nice dinner.\",\n    \"tagIds\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/{{diaryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "{{diaryId}}"]
+            },
+            "description": "Update an existing diary entry. The AI regenerates the summary when content is changed. Tag IDs can be updated independently. Only updates fields that are provided."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/diary/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/{{diaryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "{{diaryId}}"]
+            },
+            "description": "Delete a diary entry by ID. Only deletes entries belonging to the authenticated user. Associated images are also deleted."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/diary/dates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/dates",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "dates"]
+            },
+            "description": "Get all dates that have diary entries for the authenticated user. Returns an array of ISO date strings."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/diary/mood-trend",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/mood-trend?days=7",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "mood-trend"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "7",
+                  "description": "Number of days to include in the trend (default: 7)"
+                }
+              ]
+            },
+            "description": "Get mood trend data for the specified number of days. Returns day-by-day mood data, stress percentage, stress label, and AI-generated wellness suggestions."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/diary/week-moods",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/week-moods",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "week-moods"]
+            },
+            "description": "Get mood data for the past 7 days (including today). Returns date, color, and fill status for each day."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/diary/weekly",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/weekly",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "weekly"]
+            },
+            "description": "Get the weekly summary for the current week. Returns the AI-generated short summary, full summary, top tags, mood, entry count, and date range."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/diary/ai-insights",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/ai-insights?days=7",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "ai-insights"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "7",
+                  "description": "Number of days for insights (7 or 30)"
+                }
+              ]
+            },
+            "description": "Get AI-generated insights for the user's diary entries. Returns summary, insight cards with focusKeyword, personalized tips, and period label. Powered by Google Gemini AI with caching."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/diary/monthly-moods",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/monthly-moods?year=2026&month=4",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "monthly-moods"],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026",
+                  "description": "Year (YYYY)"
+                },
+                {
+                  "key": "month",
+                  "value": "4",
+                  "description": "Month (1-12)"
+                }
+              ]
+            },
+            "description": "Get mood data for each day of a specific month. Used by the MoodHeatmap component to display a color-coded calendar view."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/diary/emotional-cloud",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/emotional-cloud?year=2026&month=4",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "emotional-cloud"],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026",
+                  "description": "Year (YYYY)"
+                },
+                {
+                  "key": "month",
+                  "value": "4",
+                  "description": "Month (1-12)"
+                }
+              ]
+            },
+            "description": "Get emotional keywords extracted from the user's diary entries for a specific month. Used by the EmotionalWordCloud component."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/diary/:id/images",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "description": "Image files (JPEG, PNG, WEBP, GIF). Max 5MB per file. Max 5 images per entry."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/{{diaryId}}/images",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "{{diaryId}}", "images"]
+            },
+            "description": "Upload one or more images to a diary entry. Accepts multipart form-data with 'images' field. Max 5 images per entry, max 5MB per file. Supported formats: JPEG, PNG, WEBP, GIF."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/diary/images/:imageId",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/diary/images/{{imageId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "diary", "images", "{{imageId}}"]
+            },
+            "description": "Delete a specific image from a diary entry. The user must own the diary entry that contains the image. The image file is also deleted from disk."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "POST /api/chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"message\": \"I've been feeling stressed lately. What can I do to feel better?\",\n    \"history\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/chat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "chat"]
+            },
+            "description": "Send a message to the Diary Buddy AI chat assistant. The AI uses the user's recent diary entries as context. History array allows for multi-turn conversations (max 6 items). Requires GEMINI_API_KEY to be configured."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tags",
+      "item": [
+        {
+          "name": "GET /api/tags",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tags",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tags"]
+            },
+            "description": "Get all available tags for the authenticated user, ordered alphabetically by name. Returns id, name, icon, and color."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/tags",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.tag && res.tag.id) {",
+                  "    pm.collectionVariables.set('tagId', res.tag.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Gratitude\",\n    \"icon\": \"heart\",\n    \"color\": \"#F87171\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tags",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tags"]
+            },
+            "description": "Create a new tag. Name must be unique. Requires name, icon (e.g. 'heart', 'star', 'leaf'), and a hex color code."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/tags/:id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Thankfulness\",\n    \"icon\": \"heart\",\n    \"color\": \"#FBBF24\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tags/{{tagId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tags", "{{tagId}}"]
+            },
+            "description": "Update an existing tag. All fields are optional - only provided fields will be updated. Name must remain unique."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/tags/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tags/{{tagId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tags", "{{tagId}}"]
+            },
+            "description": "Delete a tag by ID. The tag will be disconnected from all diary entries that use it."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Transcribe",
+      "item": [
+        {
+          "name": "POST /api/transcribe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "src": "",
+                  "description": "Audio file to transcribe (M4A, MP3, WAV, etc. audio/* mimetype). Max 10MB."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/transcribe",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transcribe"]
+            },
+            "description": "Transcribe an audio file to text. Accepts multipart form-data with 'audio' field. Max file size: 10MB. Only audio files are allowed. Requires GEMINI_API_KEY to be configured."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Feedback",
+      "item": [
+        {
+          "name": "POST /api/feedback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"message\": \"The app has been really helpful for my mental wellness. I would love to see a dark mode feature added in the future. Keep up the great work!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/feedback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "feedback"]
+            },
+            "description": "Submit user feedback. This endpoint is public and does not require authentication. The message is stored in the database for review by admins."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "POST /api/admin/login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var res = pm.response.json();",
+                  "if (res.token) {",
+                  "    pm.collectionVariables.set('adminToken', res.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "login"]
+            },
+            "description": "Admin login. Returns a JWT token with role 'admin'. Default credentials: admin/admin (configured via ADMIN_USERNAME and ADMIN_PASSWORD env vars). Token expires in 12 hours."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/admin/users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users"]
+            },
+            "description": "Get all registered users with their diary entry counts. Requires admin role. Returns user id, name, email, createdAt, diaryCount, and summary statistics."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/admin/tags",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/tags",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "tags"]
+            },
+            "description": "Get all tags with their usage counts. Requires admin role. Returns id, name, icon, color, and usageCount (number of diaries using the tag)."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/admin/feedback",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/feedback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "feedback"]
+            },
+            "description": "Get all submitted feedback messages. Requires admin role. Returns feedback id, message, and createdAt, ordered by most recent first."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
