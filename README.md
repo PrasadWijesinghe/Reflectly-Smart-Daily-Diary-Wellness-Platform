@@ -18,7 +18,6 @@ Reflectly is a multi-app wellness platform for daily journaling, mood tracking, 
 ├── shared/       # Shared frontend constants
 ├── docker-compose.yml
 ├── prometheus.yml
-└── README.md
 ```
 
 ## Features
@@ -160,6 +159,3 @@ npm run lint
 - If the admin app points to the wrong API URL, rebuild the frontend image or adjust `VITE_API_URL`.
 - If Grafana shows no data, confirm that Prometheus is running and that it can reach the backend container at `backend:5000`.
 
-## License
-
-No license file is included in this repository.
