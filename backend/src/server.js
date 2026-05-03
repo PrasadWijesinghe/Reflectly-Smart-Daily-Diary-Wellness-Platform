@@ -10,7 +10,11 @@ async function bootstrap() {
     await prisma.$connect();
     console.log("✅ Database connection established");
 
-    app.listen(PORT, "0.0.0.0", () => {
+    app.listen(PORT, "0.0.0.0", (err) => {
+      if (err) {
+        console.error(`❌ Failed to start server: ${err.message}`);
+        process.exit(1);
+      }
       console.log(`✅ Server running on http://0.0.0.0:${PORT}`);
     });
   } catch (error) {
