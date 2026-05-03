@@ -259,13 +259,16 @@ async function getMoodTrend(req, res) {
     today.setUTCHours(0, 0, 0, 0);
 
     const start = new Date(today);
+    start.setUTCDate(today.getUTCDate() - (days - 1));
+    const endExclusive = new Date(today);
+    endExclusive.setUTCDate(today.getUTCDate() + 1);
 
     const entries = await prisma.dailyDiary.findMany({
       where: {
         userId: req.user.userId,
         date: {
           gte: start,
-          lt: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + days)),
+          lt: endExclusive,
         },
       },
       orderBy: { date: "asc" },
@@ -315,6 +318,97 @@ async function getMoodTrend(req, res) {
   } catch (err) {
     console.error("GetMoodTrend error:", err);
     res.status(500).json({ error: "Internal server error." });
+  }
+}
+
+async function getAiInsights(req, res) {
+  try {
+    const requestedDays = Number.parseInt(req.query.days, 10);
+    const days = requestedDays === 30 ? 30 : 7;
+    const periodLabel = days === 30 ? "last 30 days" : "last 7 days";
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setUTCDate(today.getUTCDate() - (days - 1));
+    const endExclusive = new Date(today);
+    endExclusive.setUTCDate(today.getUTCDate() + 1);
+
+    const entries = await prisma.dailyDiary.findMany({
+      where: {
+        userId: req.user.userId,
+        date: {
+          gte: start,
+          lt: endExclusive,
+        },
+      },
+      include: { tags: true },
+      orderBy: { date: "asc" },
+    });
+
+    const cacheKey = `${req.user.userId}:${days}:${entries.length}:${entries[entries.length - 1]?.updatedAt?.getTime?.() || 0}`;
+    const cached = getCachedInsightsPanel(cacheKey);
+    if (cached) {
+      return res.json({ ...cached, periodLabel });
+    }
+
+    const moodScores = entries
+      .map((entry) => Number(entry.moodScore))
+      .filter((value) => Number.isFinite(value));
+    const averageMood = moodScores.length
+      ? Math.round(moodScores.reduce((sum, value) => sum + value, 0) / moodScores.length)
+      : 0;
+
+    const stressScores = entries.map((entry) => getStressScore(entry));
+    const averageStress = stressScores.length
+      ? Math.round(stressScores.reduce((sum, value) => sum + value, 0) / stressScores.length)
+      : 0;
+
+    const tagCounts = new Map();
+    for (const entry of entries) {
+      for (const tag of entry.tags || []) {
+        const current = tagCounts.get(tag.name) || { label: tag.name, count: 0 };
+        current.count += 1;
+        tagCounts.set(tag.name, current);
+      }
+    }
+    const topTopics = Array.from(tagCounts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const entrySnapshots = entries.map((entry) => ({
+      dayLabel: new Date(entry.date).toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
+      }),
+      moodScore: Number(entry.moodScore) || 0,
+      stressScore: getStressScore(entry),
+    }));
+    const sortedByMood = [...entrySnapshots].sort((a, b) => b.moodScore - a.moodScore);
+    const bestDay = sortedByMood[0] || null;
+    const worstDay = sortedByMood.length ? sortedByMood[sortedByMood.length - 1] : null;
+    const positiveDays = moodScores.filter((score) => score >= 60).length;
+    const negativeDays = moodScores.filter((score) => score <= 40).length;
+
+    const panel = await generateAIInsightsPanel({
+      periodLabel,
+      entryCount: entries.length,
+      averageMood,
+      averageStress,
+      topTopics,
+      bestDay,
+      worstDay,
+      positiveDays,
+      negativeDays,
+    });
+
+    setCachedInsightsPanel(cacheKey, panel);
+    return res.json({ ...panel, periodLabel });
+  } catch (err) {
+    console.error("GetAiInsights error:", err);
+    return res.status(500).json({ error: "Internal server error." });
   }
 }
 
@@ -460,7 +554,7 @@ async function updateEntry(req, res) {
       console.log(`[AI Summary] Generating summary for entry ${existing.id}, user ${req.user.userId}`);
       updateData.summary = await generateAISummary(content);
       console.log(`[AI Summary] Generated: "${updateData.summary}"`);
-      
+
       console.log(`[AI Mood] Analyzing mood for entry ${existing.id}`);
       updateData.moodScore = await analyzeMoodScore(content);
       console.log(`[AI Mood] Result: ${updateData.moodScore}`);
@@ -576,25 +670,7 @@ async function getEmotionalCloud(req, res) {
   }
 }
 
-async function getAiInsights(req, res) {
-  try {
-    const requestedDays = Number.parseInt(req.query.days, 10);
-    const days = Number.isFinite(requestedDays) && requestedDays > 0 ? requestedDays : 7;
-    const cacheKey = `user:${req.user.userId}:days:${days}`;
 
-    const cached = getCachedInsightsPanel(cacheKey);
-    if (cached) {
-      return res.json(cached);
-    }
-
-    const panel = await generateAIInsightsPanel(req.user.userId, days);
-    setCachedInsightsPanel(cacheKey, panel);
-    res.json(panel);
-  } catch (err) {
-    console.error("GetAiInsights error:", err);
-    res.status(500).json({ error: "Internal server error." });
-  }
-}
 
 async function deleteEntry(req, res) {
   try {
@@ -617,6 +693,8 @@ async function deleteEntry(req, res) {
     res.status(500).json({ error: "Internal server error." });
   }
 }
+
+
 
 module.exports = {
   createEntry,
