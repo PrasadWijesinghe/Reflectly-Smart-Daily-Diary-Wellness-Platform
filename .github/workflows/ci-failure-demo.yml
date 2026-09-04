@@ -1,0 +1,124 @@
+name: CI/CD Failure Prediction Demo
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  admin-validation:
+    name: Admin - Lint and Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: admin
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint checks
+        run: npm run lint
+
+      - name: Build admin dashboard
+        run: npm run build
+
+  backend-validation:
+    name: Backend - Dependency and Prisma Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+  mobile-validation:
+    name: Mobile - Expo Configuration Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: reflectly
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: reflectly/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Expo configuration
+        run: npx expo config --type public
+
+  deployment-readiness:
+    name: Deployment - Configuration Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - admin-validation
+      - backend-validation
+      - mobile-validation
+
+    steps:
+      - name: Report validation results
+        run: |
+          echo "Admin validation: ${{ needs.admin-validation.result }}"
+          echo "Backend validation: ${{ needs.backend-validation.result }}"
+          echo "Mobile validation: ${{ needs.mobile-validation.result }}"
+
+      # This controlled missing-secret check creates the infrastructure/deployment
+      # failure used by the prediction and explainability research demonstration.
+      - name: Validate deployment target
+        env:
+          DEPLOYMENT_TARGET: ${{ secrets.DEMO_DEPLOYMENT_TARGET }}
+        run: |
+          if [ -z "$DEPLOYMENT_TARGET" ]; then
+            echo "::error title=Infrastructure and Deployment Failure::Required secret DEMO_DEPLOYMENT_TARGET is not configured."
+            echo "Cause: the workflow cannot determine where the application should be deployed."
+            echo "Remediation: add DEMO_DEPLOYMENT_TARGET under repository Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+          echo "Deployment configuration is valid for target: $DEPLOYMENT_TARGET"
