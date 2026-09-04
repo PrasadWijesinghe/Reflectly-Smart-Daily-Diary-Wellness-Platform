@@ -12,10 +12,12 @@ const { register, recordHttpMetrics } = require("./utils/metrics");
 
 const app = express();
 
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 
 // Request logging + Prometheus metrics
 app.use((req, res, next) => {
