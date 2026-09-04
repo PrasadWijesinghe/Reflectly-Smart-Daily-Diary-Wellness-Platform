@@ -7,7 +7,7 @@ import { Dashboard } from "./components/Dashboard";
 import { UsersList } from "./components/UsersList";
 import { TagsList } from "./components/TagsList";
 import { FeedbackList } from "./components/FeedbackList";
-import { SystemHealth } from "./components/SystemHealth";
+import { SystemHealth } from "./components/SystemStatus";
 
 const STORAGE_KEY = "reflectly_admin_token";
 

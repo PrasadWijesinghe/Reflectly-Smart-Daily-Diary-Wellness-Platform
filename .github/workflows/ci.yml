@@ -1,7 +1,10 @@
-name: CI/CD Failure Prediction Demo
+name: Continuous Integration
 
 on:
   push:
+    branches:
+      - main
+  pull_request:
     branches:
       - main
   workflow_dispatch:
@@ -10,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-demo-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -39,11 +42,11 @@ jobs:
       - name: Run lint checks
         run: npm run lint
 
-      - name: Build admin dashboard
+      - name: Build admin application
         run: npm run build
 
   backend-validation:
-    name: Backend - Dependency and Prisma Validation
+    name: Backend - Validate Prisma
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -68,7 +71,7 @@ jobs:
         run: npm run prisma:generate
 
   mobile-validation:
-    name: Mobile - Expo Configuration Validation
+    name: Mobile - Validate Expo Configuration
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -91,34 +94,3 @@ jobs:
 
       - name: Validate Expo configuration
         run: npx expo config --type public
-
-  deployment-readiness:
-    name: Deployment - Configuration Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs:
-      - admin-validation
-      - backend-validation
-      - mobile-validation
-
-    steps:
-      - name: Report validation results
-        run: |
-          echo "Admin validation: ${{ needs.admin-validation.result }}"
-          echo "Backend validation: ${{ needs.backend-validation.result }}"
-          echo "Mobile validation: ${{ needs.mobile-validation.result }}"
-
-      # This controlled missing-secret check creates the infrastructure/deployment
-      # failure used by the prediction and explainability research demonstration.
-      - name: Validate deployment target
-        env:
-          DEPLOYMENT_TARGET: ${{ secrets.DEMO_DEPLOYMENT_TARGET }}
-        run: |
-          if [ -z "$DEPLOYMENT_TARGET" ]; then
-            echo "::error title=Infrastructure and Deployment Failure::Required secret DEMO_DEPLOYMENT_TARGET is not configured."
-            echo "Cause: the workflow cannot determine where the application should be deployed."
-            echo "Remediation: add DEMO_DEPLOYMENT_TARGET under repository Settings > Secrets and variables > Actions."
-            exit 1
-          fi
-
-          echo "Deployment configuration is valid for target: $DEPLOYMENT_TARGET"
